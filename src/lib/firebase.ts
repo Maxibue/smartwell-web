@@ -3,6 +3,8 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+// ✅ SEGURIDAD: Importar App Check para proteger contra uso no autorizado
+// import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -19,4 +21,18 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// ✅ SEGURIDAD: Inicializar App Check
+// IMPORTANTE: Descomenta esto después de configurar reCAPTCHA v3
+// Ver instrucciones en: FIREBASE_APP_CHECK_SETUP.md
+/*
+if (typeof window !== 'undefined' && !getApps().length) {
+    const appCheck = initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!),
+        isTokenAutoRefreshEnabled: true
+    });
+    console.log('✅ Firebase App Check habilitado');
+}
+*/
+
 export { app, auth, db };
+

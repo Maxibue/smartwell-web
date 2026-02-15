@@ -158,13 +158,26 @@ export default function ReservarPage() {
 
             // Send confirmation emails (don't block on email sending)
             try {
+                // Get authentication token
+                const user = auth.currentUser;
+                const token = user ? await user.getIdToken() : null;
+
+                if (!token) {
+                    console.warn('No auth token available for email sending');
+                    throw new Error('Authentication required');
+                }
+
                 // Send email to patient
                 await fetch('/api/send-email', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({
                         type: 'patient_confirmation',
                         data: {
+                            patientId: userId,
                             patientName: userData?.displayName || userData?.email || 'Usuario',
                             patientEmail: userData?.email || '',
                             professionalName: `${professional.title} ${professional.firstName} ${professional.lastName}`,
@@ -181,10 +194,14 @@ export default function ReservarPage() {
                 // Send email to professional
                 await fetch('/api/send-email', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({
                         type: 'professional_notification',
                         data: {
+                            professionalId: professionalId,
                             patientName: userData?.displayName || userData?.email || 'Usuario',
                             patientEmail: userData?.email || '',
                             professionalName: `${professional.title} ${professional.firstName} ${professional.lastName}`,
