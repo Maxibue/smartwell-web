@@ -1,0 +1,22 @@
+[
+    {
+        "origin": [
+            "https://smartwellapp.com",
+            "https://www.smartwellapp.com",
+            "http://localhost:3000",
+            "http://localhost:3001"
+        ],
+        "method": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "HEAD"
+        ],
+        "maxAgeSeconds": 3600,
+        "responseHeader": [
+            "Content-Type",
+            "Authorization"
+        ]
+    }
+]

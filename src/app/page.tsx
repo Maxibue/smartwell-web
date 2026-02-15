@@ -1,101 +1,213 @@
+
+import { Button } from "@/components/ui/Button";
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
+import { ArrowRight, CheckCircle2, Star, ShieldCheck, HeartHandshake, Clock, Lock } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen flex flex-col bg-white">
+      <Navbar />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+      <main className="flex-1">
+        {/* NEW HERO SECTION */}
+        <section className="relative pt-12 pb-20 lg:pt-24 lg:pb-32 overflow-hidden bg-white">
+          <div className="container px-4 md:px-6 mx-auto">
+            <div className="grid gap-12 lg:grid-cols-2 items-center">
+
+              {/* Left Column: Content */}
+              <div className="space-y-8 max-w-2xl relative z-10">
+                <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary shadow-sm hover:bg-primary/10 transition-colors">
+                  <span className="flex h-2 w-2 rounded-full bg-primary mr-2 animate-pulse"></span>
+                  SMARTWELL – Red de bienestar profesional en LATAM
+                </div>
+
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold font-display tracking-tight text-secondary leading-[1.15]">
+                  Encontrá el profesional ideal para tu <span className="text-primary relative inline-block">
+                    momento de vida.
+                    <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary/20" viewBox="0 0 100 10" preserveAspectRatio="none">
+                      <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="3" fill="none" />
+                    </svg>
+                  </span>
+                </h1>
+
+                <p className="text-lg md:text-xl text-text-secondary max-w-[540px] leading-relaxed">
+                  Conectamos personas con profesionales de bienestar validados. <span className="font-medium text-secondary">Matching humano. Acompañamiento real.</span>
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                  <Button size="lg" className="text-lg px-8 h-14 rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all transform hover:-translate-y-0.5" asChild>
+                    <Link href="/comenzar">
+                      Buscar profesional
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" className="text-lg px-8 h-14 rounded-xl border-2 hover:bg-neutral-50" asChild>
+                    <Link href="/para-profesionales">
+                      Soy profesional <ArrowRight className="ml-2 h-5 w-5" />
+                    </Link>
+                  </Button>
+                </div>
+
+                {/* Trust Indicators */}
+                <div className="pt-8 flex flex-wrap gap-y-4 gap-x-8 text-sm font-medium text-text-secondary border-t border-neutral-100 mt-8">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-primary" />
+                    <span>Profesionales validados en Argentina</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-primary" />
+                    <span>Respuesta en menos de 24 horas</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-5 w-5 text-primary" />
+                    <span>100% confidencial</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Hero Image */}
+              <div className="relative mx-auto w-full max-w-[480px] lg:max-w-[520px]">
+                {/* Decorative blob background */}
+                <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+                <div className="absolute -bottom-24 -left-12 w-80 h-80 bg-secondary/5 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+
+                <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white transform transition-transform hover:scale-[1.01] duration-500">
+                  <Image
+                    src="/hero-modern.png"
+                    alt="Bienestar y Mindfulness"
+                    width={800}
+                    height={800}
+                    className="w-full h-auto object-cover bg-neutral-50"
+                    priority
+                  />
+
+                  {/* Floating Card - Removed to match baked-in image */}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* Features / How it works */}
+        <section className="py-24 bg-neutral-50 relative overflow-hidden">
+          {/* Subtle Background Pattern */}
+          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+            <svg width="200" height="200" viewBox="0 0 100 100" fill="currentColor" className="text-secondary">
+              <circle cx="50" cy="50" r="40" />
+            </svg>
+          </div>
+
+          <div className="container px-4 md:px-6 mx-auto relative z-10">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <span className="text-primary font-semibold tracking-wider text-sm uppercase mb-2 block">El proceso</span>
+              <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-4">Tu bienestar, simplificado</h2>
+              <p className="text-text-secondary text-lg">Un camino claro y directo para conectar con el profesional que necesitás.</p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                {
+                  icon: <HeartHandshake className="h-8 w-8 text-white" />,
+                  title: "1. Contanos qué te pasa",
+                  desc: "Completá un breve cuestionario, 100% confidencial, para entender mejor qué tipo de acompañamiento buscás.",
+                  color: "bg-primary"
+                },
+                {
+                  icon: <Star className="h-8 w-8 text-white" />,
+                  title: "2. Matching Inteligente",
+                  desc: "Nuestro equipo (humanos, no robots) selecciona a los profesionales ideales para tu situación específica.",
+                  color: "bg-accent"
+                },
+                {
+                  icon: <CheckCircle2 className="h-8 w-8 text-white" />,
+                  title: "3. Conectá y comenzá",
+                  desc: "Elegí el profesional que más te resuene, agendá tu primer encuentro y empezá tu proceso.",
+                  color: "bg-secondary"
+                }
+              ].map((feature, i) => (
+                <div key={i} className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-neutral-100 group">
+                  <div className={`inline-flex p-4 rounded-xl shadow-lg shadow-black/5 mb-6 ${feature.color} transform group-hover:scale-110 transition-transform duration-300`}>
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-bold text-secondary mb-3">{feature.title}</h3>
+                  <p className="text-text-secondary leading-relaxed">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Categories Grid */}
+        <section className="py-24 bg-white">
+          <div className="container px-4 md:px-6 mx-auto">
+            <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
+              <div className="max-w-2xl">
+                <span className="text-accent font-semibold tracking-wider text-sm uppercase mb-2 block">Especialidades</span>
+                <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-4">Apoyo donde más importa</h2>
+                <p className="text-text-secondary text-lg">No estás solo. Encontrá profesionales expertos en las áreas clave de tu vida.</p>
+              </div>
+              <Button variant="ghost" className="hidden md:inline-flex text-secondary font-semibold hover:bg-neutral-50 group" asChild>
+                <Link href="/profesionales">
+                  Ver todas las áreas <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { name: 'Psicología Clínica', color: 'bg-blue-50 text-blue-700 hover:border-blue-200' },
+                { name: 'Nutrición Deportiva', color: 'bg-green-50 text-green-700 hover:border-green-200' },
+                { name: 'Lactancia y Sueño', color: 'bg-orange-50 text-orange-700 hover:border-orange-200' },
+                { name: 'Coaching y Liderazgo', color: 'bg-indigo-50 text-indigo-700 hover:border-indigo-200' },
+                { name: 'Terapia de Pareja', color: 'bg-pink-50 text-pink-700 hover:border-pink-200' },
+                { name: 'Desarrollo Profesional', color: 'bg-teal-50 text-teal-700 hover:border-teal-200' },
+                { name: 'Alim. Consciente', color: 'bg-yellow-50 text-yellow-700 hover:border-yellow-200' },
+                { name: 'Ansiedad y Estrés', color: 'bg-purple-50 text-purple-700 hover:border-purple-200' }
+              ].map((cat) => (
+                <Link key={cat.name} href={`/profesionales?cat=${cat.name}`} className={`group relative h-32 flex flex-col justify-end overflow-hidden rounded-2xl p-6 transition-all border border-transparent hover:shadow-lg ${cat.color}`}>
+                  <h3 className="font-bold text-lg relative z-10">{cat.name}</h3>
+                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                    <ArrowRight className="h-5 w-5" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-8 text-center md:hidden">
+              <Button variant="outline" className="w-full h-12 rounded-xl" asChild>
+                <Link href="/profesionales">Explorar todas</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="py-24 bg-secondary relative overflow-hidden">
+          {/* Abstract pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <path d="M0 100 L100 0 L100 100 Z" fill="#2CBFAE" />
+            </svg>
+          </div>
+
+          <div className="container px-4 md:px-6 mx-auto relative z-10 text-center">
+            <h2 className="text-3xl md:text-5xl font-bold font-display text-white mb-6 leading-tight">
+              Empezá tu camino de <br className="hidden md:block" /> bienestar hoy.
+            </h2>
+            <p className="text-blue-100 text-lg md:text-xl mb-10 max-w-2xl mx-auto font-light">
+              Sin esperas, sin complicaciones. Conectá con profesionales que realmente te entienden.
+            </p>
+            <Button size="lg" className="bg-primary hover:bg-primary-active text-white border-0 text-lg px-8 h-14 rounded-full shadow-2xl shadow-primary/20 transform hover:scale-105 transition-all duration-300" asChild>
+              <Link href="/comenzar">Buscar mi profesional</Link>
+            </Button>
+          </div>
+        </section>
+
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      <Footer />
     </div>
   );
 }
