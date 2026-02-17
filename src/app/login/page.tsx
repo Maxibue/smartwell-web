@@ -39,15 +39,28 @@ export default function LoginPage() {
             const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
             const user = userCredential.user;
 
-            // Check if professional
+            // ✅ MEJORADO: Redirección inteligente basada en rol
+            // Primero verificar si es profesional
             const proDoc = await getDoc(doc(db, "professionals", user.uid));
 
             if (proDoc.exists()) {
+                // Es profesional → ir a panel profesional
                 router.push("/panel-profesional");
-            } else {
-                // Assume user/patient
-                router.push("/");
+                return;
             }
+
+            // Verificar si es admin
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            const userData = userDoc.data();
+
+            if (userData?.role === "admin") {
+                // Es admin → ir a panel admin
+                router.push("/panel-admin");
+                return;
+            }
+
+            // Es usuario regular → ir a panel usuario
+            router.push("/panel-usuario");
 
         } catch (err: any) {
             console.error(err);
