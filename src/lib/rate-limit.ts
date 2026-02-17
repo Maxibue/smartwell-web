@@ -1,7 +1,5 @@
 // Sistema de rate limiting simple basado en memoria
-// Para producción a escala, considerar usar Upst
-
-ash o Vercel KV
+// Para producción a escala, considerar usar Upstash o Vercel KV
 
 interface RateLimitEntry {
     count: number;
@@ -98,11 +96,15 @@ export function checkRateLimit(
  */
 function cleanupExpiredEntries() {
     const now = Date.now();
-    for (const [key, entry] of requestCounts.entries()) {
+    const keysToDelete: string[] = [];
+
+    requestCounts.forEach((entry, key) => {
         if (now > entry.resetTime) {
-            requestCounts.delete(key);
+            keysToDelete.push(key);
         }
-    }
+    });
+
+    keysToDelete.forEach(key => requestCounts.delete(key));
 }
 
 /**
@@ -126,9 +128,6 @@ export function getRateLimitIdentifier(request: Request): string {
     return ip;
 }
 
-/**
- * Middleware helper para Next.js API routes
- */
 export function withRateLimit(
     config: RateLimitConfig = RateLimitPresets.api
 ) {
@@ -136,7 +135,7 @@ export function withRateLimit(
         const identifier = getRateLimitIdentifier(request);
         const result = checkRateLimit(identifier, config);
 
-        const headers = {
+        const headers: Record<string, string> = {
             'X-RateLimit-Limit': config.maxRequests.toString(),
             'X-RateLimit-Remaining': result.remaining.toString(),
             'X-RateLimit-Reset': new Date(result.resetTime).toISOString(),

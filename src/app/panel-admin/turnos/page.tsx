@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { cancelAppointmentAdmin } from "@/lib/admin-api";
 import { Search, Calendar, Filter, Loader2, XCircle, Eye } from "lucide-react";
 
 interface Appointment {
@@ -19,6 +21,7 @@ interface Appointment {
 }
 
 export default function TurnosPage() {
+    const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -26,7 +29,11 @@ export default function TurnosPage() {
     const [statusFilter, setStatusFilter] = useState<string>("all");
 
     useEffect(() => {
-        fetchAppointments();
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setCurrentUser(user);
+            fetchAppointments();
+        });
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -108,20 +115,23 @@ export default function TurnosPage() {
     };
 
     const handleCancelAppointment = async (appointmentId: string) => {
+        if (!currentUser) {
+            alert("Debes estar autenticado para realizar esta acción.");
+            return;
+        }
+
         const confirmed = confirm("¿Estás seguro que querés cancelar este turno?");
         if (!confirmed) return;
 
         try {
-            await updateDoc(doc(db, "appointments", appointmentId), {
-                status: "cancelled",
-                cancelledAt: new Date(),
-            });
+            // ✅ SEGURO: Usar API route protegida con audit logging
+            await cancelAppointmentAdmin(currentUser, appointmentId, "Cancelado por administrador");
 
             alert("Turno cancelado correctamente.");
             fetchAppointments();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error cancelling appointment:", error);
-            alert("Hubo un error al cancelar el turno.");
+            alert(error.message || "Hubo un error al cancelar el turno.");
         }
     };
 
@@ -179,8 +189,8 @@ export default function TurnosPage() {
                         key={stat.filter}
                         onClick={() => setStatusFilter(stat.filter)}
                         className={`p-4 rounded-lg border-2 transition-all ${statusFilter === stat.filter
-                                ? "border-primary bg-primary/5"
-                                : "border-neutral-200 hover:border-neutral-300"
+                            ? "border-primary bg-primary/5"
+                            : "border-neutral-200 hover:border-neutral-300"
                             }`}
                     >
                         <p className="text-2xl font-bold text-secondary">{stat.value}</p>

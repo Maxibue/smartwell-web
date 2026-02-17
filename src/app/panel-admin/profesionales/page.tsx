@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, doc, updateDoc, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { approveProfessional, rejectProfessional } from "@/lib/admin-api";
 import { Search, Filter, CheckCircle, XCircle, Eye, Loader2, Clock, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +22,7 @@ interface Professional {
 }
 
 export default function ProfessionalesPage() {
+    const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [professionals, setProfessionals] = useState<Professional[]>([]);
     const [filteredProfessionals, setFilteredProfessionals] = useState<Professional[]>([]);
     const [loading, setLoading] = useState(true);
@@ -27,7 +30,11 @@ export default function ProfessionalesPage() {
     const [statusFilter, setStatusFilter] = useState<string>("all");
 
     useEffect(() => {
-        fetchProfessionals();
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setCurrentUser(user);
+            fetchProfessionals();
+        });
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -86,6 +93,11 @@ export default function ProfessionalesPage() {
     };
 
     const handleStatusChange = async (professionalId: string, newStatus: "approved" | "rejected") => {
+        if (!currentUser) {
+            alert("Debes estar autenticado para realizar esta acción.");
+            return;
+        }
+
         const confirmed = confirm(
             `¿Estás seguro que querés ${newStatus === "approved" ? "aprobar" : "rechazar"} este profesional?`
         );
@@ -93,16 +105,18 @@ export default function ProfessionalesPage() {
         if (!confirmed) return;
 
         try {
-            await updateDoc(doc(db, "professionals", professionalId), {
-                status: newStatus,
-                reviewedAt: new Date(),
-            });
+            // ✅ SEGURO: Usar API route protegida con audit logging
+            if (newStatus === "approved") {
+                await approveProfessional(currentUser, professionalId);
+            } else {
+                await rejectProfessional(currentUser, professionalId);
+            }
 
             alert(`Profesional ${newStatus === "approved" ? "aprobado" : "rechazado"} correctamente.`);
             fetchProfessionals();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error updating professional status:", error);
-            alert("Hubo un error al actualizar el estado.");
+            alert(error.message || "Hubo un error al actualizar el estado.");
         }
     };
 
@@ -160,8 +174,8 @@ export default function ProfessionalesPage() {
                         key={stat.filter}
                         onClick={() => setStatusFilter(stat.filter)}
                         className={`p-4 rounded-lg border-2 transition-all ${statusFilter === stat.filter
-                                ? "border-primary bg-primary/5"
-                                : "border-neutral-200 hover:border-neutral-300"
+                            ? "border-primary bg-primary/5"
+                            : "border-neutral-200 hover:border-neutral-300"
                             }`}
                     >
                         <p className="text-2xl font-bold text-secondary">{stat.value}</p>

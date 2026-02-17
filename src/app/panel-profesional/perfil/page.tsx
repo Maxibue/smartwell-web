@@ -9,6 +9,7 @@ import { db, auth } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { PROFESSIONAL_CATEGORIES, getCategoryName } from "@/lib/categories";
+import { sanitizeText, sanitizeHTML, sanitizePhone, sanitizeURL, detectXSS } from "@/lib/sanitize";
 
 interface ProfessionalProfile {
     uid: string;
@@ -93,23 +94,52 @@ export default function ProfilePage() {
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
+
+        // ✅ SEGURIDAD: Detectar posibles ataques XSS
+        const fieldsToCheck = [profile.name, profile.title, profile.bio, profile.specialty];
+        for (const field of fieldsToCheck) {
+            if (detectXSS(field)) {
+                alert("⚠️ Se detectó contenido sospechoso en el formulario. Por favor, evitá usar caracteres especiales como <script>, javascript:, etc.");
+                return;
+            }
+        }
+
         setSaving(true);
 
         try {
+            // ✅ SEGURIDAD: Sanitizar todos los campos antes de guardar
+            const sanitizedName = sanitizeText(profile.name);
+            const sanitizedTitle = sanitizeText(profile.title);
+            const sanitizedBio = sanitizeHTML(profile.bio);
+            const sanitizedSpecialty = sanitizeText(profile.specialty);
+            const sanitizedPhone = profile.phone ? sanitizePhone(profile.phone) : "";
+            const sanitizedImage = profile.image ? sanitizeURL(profile.image) : "";
+
             const docRef = doc(db, "professionals", user.uid);
             await updateDoc(docRef, {
-                name: profile.name,
-                phone: profile.phone,
-                title: profile.title,
-                description: profile.bio, // Sync back to description field
-                specialty: profile.specialty,
+                name: sanitizedName,
+                phone: sanitizedPhone,
+                title: sanitizedTitle,
+                description: sanitizedBio,
+                specialty: sanitizedSpecialty,
                 category: profile.category,
                 price: parseFloat(profile.price) || 0,
                 duration: parseInt(profile.duration) || 50,
-                image: profile.image,
+                image: sanitizedImage,
                 updatedAt: new Date()
-                // Do not update status here, that's admin only
             });
+
+            // Actualizar estado local con valores sanitizados
+            setProfile(prev => ({
+                ...prev,
+                name: sanitizedName,
+                title: sanitizedTitle,
+                bio: sanitizedBio,
+                specialty: sanitizedSpecialty,
+                phone: sanitizedPhone,
+                image: sanitizedImage,
+            }));
+
             alert("Perfil actualizado correctamente.");
         } catch (error) {
             console.error("Error updating profile:", error);

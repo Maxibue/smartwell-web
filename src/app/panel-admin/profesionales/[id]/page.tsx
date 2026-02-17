@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { approveProfessional, rejectProfessional } from "@/lib/admin-api";
 import {
     ArrowLeft,
     Mail,
@@ -43,14 +45,19 @@ export default function ProfessionalDetailPage() {
     const router = useRouter();
     const professionalId = params.id as string;
 
+    const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [professional, setProfessional] = useState<ProfessionalDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
-        if (professionalId) {
-            fetchProfessional();
-        }
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setCurrentUser(user);
+            if (professionalId) {
+                fetchProfessional();
+            }
+        });
+        return () => unsubscribe();
     }, [professionalId]);
 
     const fetchProfessional = async () => {
@@ -90,6 +97,11 @@ export default function ProfessionalDetailPage() {
     };
 
     const handleStatusChange = async (newStatus: "approved" | "rejected") => {
+        if (!currentUser) {
+            alert("Debes estar autenticado para realizar esta acción.");
+            return;
+        }
+
         const confirmed = confirm(
             `¿Estás seguro que querés ${newStatus === "approved" ? "aprobar" : "rechazar"} a ${professional?.name}?`
         );
@@ -98,16 +110,18 @@ export default function ProfessionalDetailPage() {
 
         setUpdating(true);
         try {
-            await updateDoc(doc(db, "professionals", professionalId), {
-                status: newStatus,
-                reviewedAt: new Date(),
-            });
+            // ✅ SEGURO: Usar API route protegida con audit logging
+            if (newStatus === "approved") {
+                await approveProfessional(currentUser, professionalId);
+            } else {
+                await rejectProfessional(currentUser, professionalId);
+            }
 
             alert(`Profesional ${newStatus === "approved" ? "aprobado" : "rechazado"} correctamente.`);
             fetchProfessional();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error updating professional status:", error);
-            alert("Hubo un error al actualizar el estado.");
+            alert(error.message || "Hubo un error al actualizar el estado.");
         } finally {
             setUpdating(false);
         }

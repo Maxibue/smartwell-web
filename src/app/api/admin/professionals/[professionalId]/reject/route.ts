@@ -46,9 +46,9 @@ export async function POST(
         const professionalData = professionalSnap.data();
         const previousStatus = professionalData.status;
 
-        // 4. Actualizar estado a aprobado
+        // 4. Actualizar estado a rechazado
         await updateDoc(professionalRef, {
-            status: 'approved',
+            status: 'rejected',
             reviewedAt: new Date(),
             reviewedBy: adminUid,
         });
@@ -61,31 +61,31 @@ export async function POST(
         await logAdminAction(
             adminUid,
             adminEmail,
-            AdminActions.APPROVE_PROFESSIONAL,
+            AdminActions.REJECT_PROFESSIONAL,
             professionalId,
             'professional',
             {
                 previousStatus,
-                newStatus: 'approved',
+                newStatus: 'rejected',
                 professionalName: professionalData.name,
                 professionalEmail: professionalData.email,
             }
         );
 
-        // 7. TODO: Enviar email al profesional notificando la aprobación
-        // await sendApprovalEmail(professionalData.email, professionalData.name);
+        // 7. TODO: Enviar email al profesional notificando el rechazo
+        // await sendRejectionEmail(professionalData.email, professionalData.name);
 
         return NextResponse.json({
             success: true,
-            message: 'Profesional aprobado correctamente.',
+            message: 'Profesional rechazado correctamente.',
             data: {
                 professionalId,
-                status: 'approved',
+                status: 'rejected',
             }
         });
 
     } catch (error) {
-        console.error('Error approving professional:', error);
+        console.error('Error rejecting professional:', error);
         return NextResponse.json(
             { error: 'Error interno del servidor.' },
             { status: 500 }

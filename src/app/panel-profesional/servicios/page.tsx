@@ -9,6 +9,7 @@ import { Clock, DollarSign, Plus, Trash2, Edit2, Loader2 } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc, query } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
+import { sanitizeText, sanitizeHTML, detectXSS } from "@/lib/sanitize";
 
 interface Service {
     id: string;
@@ -66,11 +67,21 @@ export default function ServicesPage() {
         e.preventDefault();
         if (!user) return;
 
+        // ✅ SEGURIDAD: Detectar XSS
+        if (detectXSS(formData.name) || detectXSS(formData.description)) {
+            alert("⚠️ Se detectó contenido sospechoso. Evitá usar caracteres especiales como <script>, javascript:, etc.");
+            return;
+        }
+
         setSubmitting(true);
         try {
+            // ✅ SEGURIDAD: Sanitizar campos
+            const sanitizedName = sanitizeText(formData.name);
+            const sanitizedDescription = sanitizeHTML(formData.description);
+
             const newServiceData = {
-                name: formData.name,
-                description: formData.description,
+                name: sanitizedName,
+                description: sanitizedDescription,
                 duration: parseInt(formData.duration),
                 price: parseFloat(formData.price),
             };
@@ -79,7 +90,7 @@ export default function ServicesPage() {
 
             setServices([...services, { id: docRef.id, ...newServiceData }]);
             setIsCreating(false);
-            setFormData({ name: "", description: "", duration: "50", price: "" }); // Reset
+            setFormData({ name: "", description: "", duration: "50", price: "" });
         } catch (error) {
             console.error("Error adding service:", error);
         } finally {

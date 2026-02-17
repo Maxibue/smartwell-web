@@ -14,7 +14,8 @@ import {
     DollarSign,
     LogOut,
     Loader2,
-    Shield
+    Shield,
+    FileText
 } from "lucide-react";
 
 interface AdminLayoutProps {
@@ -74,6 +75,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { icon: Users, label: "Usuarios", href: "/panel-admin/usuarios" },
         { icon: Calendar, label: "Turnos", href: "/panel-admin/turnos" },
         { icon: DollarSign, label: "Financiero", href: "/panel-admin/financiero" },
+        { icon: FileText, label: "Audit Logs", href: "/panel-admin/logs" },
     ];
 
     if (loading) {
@@ -115,8 +117,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                                 key={item.href}
                                 href={item.href}
                                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
-                                        ? "bg-primary text-white shadow-lg"
-                                        : "text-primary-light hover:bg-white/10 hover:text-white"
+                                    ? "bg-primary text-white shadow-lg"
+                                    : "text-primary-light hover:bg-white/10 hover:text-white"
                                     }`}
                             >
                                 <Icon className="h-5 w-5" />

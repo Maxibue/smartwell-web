@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Star } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Textarea } from "./ui/Textarea";
+import { sanitizeComment, detectXSS } from "@/lib/sanitize";
 
 interface ReviewFormProps {
     professionalId: string;
@@ -38,9 +39,17 @@ export function ReviewForm({
             return;
         }
 
+        // Detectar intentos de XSS
+        if (detectXSS(comment)) {
+            setError("El comentario contiene contenido no permitido. Por favor, revisa tu texto.");
+            return;
+        }
+
         try {
             setSubmitting(true);
-            await onSubmit(rating, comment);
+            // Sanitizar el comentario antes de enviarlo
+            const sanitizedComment = sanitizeComment(comment);
+            await onSubmit(rating, sanitizedComment);
         } catch (err: any) {
             setError(err.message || "Error al enviar la calificación");
         } finally {

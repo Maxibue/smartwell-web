@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { sanitizeHTML, detectXSS } from '@/lib/sanitize';
 
 interface Patient {
     id: string;
@@ -139,13 +140,22 @@ export default function ProfessionalPatientsPage() {
     const handleSaveNotes = async () => {
         if (!user || !selectedPatient) return;
 
+        // ✅ SEGURIDAD: Detectar XSS
+        if (detectXSS(notes)) {
+            alert("⚠️ Se detectó contenido sospechoso en las notas. Evitá usar caracteres especiales como <script>, javascript:, etc.");
+            return;
+        }
+
         setSavingNotes(true);
         try {
+            // ✅ SEGURIDAD: Sanitizar notas
+            const sanitizedNotes = sanitizeHTML(notes);
+
             const noteId = `${user.uid}_${selectedPatient.id}`;
             const noteRef = doc(db, 'patientNotes', noteId);
 
             await updateDoc(noteRef, {
-                content: notes,
+                content: sanitizedNotes,
                 updatedAt: Timestamp.now(),
             }).catch(async () => {
                 // If document doesn't exist, create it
@@ -153,18 +163,19 @@ export default function ProfessionalPatientsPage() {
                     id: noteId,
                     patientId: selectedPatient.id,
                     professionalId: user.uid,
-                    content: notes,
+                    content: sanitizedNotes,
                     createdAt: Timestamp.now(),
                     updatedAt: Timestamp.now(),
                 });
             });
 
-            // Update local state
+            // Update local state with sanitized notes
             const updatedPatients = patients.map(p =>
-                p.id === selectedPatient.id ? { ...p, notes } : p
+                p.id === selectedPatient.id ? { ...p, notes: sanitizedNotes } : p
             );
             setPatients(updatedPatients);
-            setSelectedPatient({ ...selectedPatient, notes });
+            setSelectedPatient({ ...selectedPatient, notes: sanitizedNotes });
+            setNotes(sanitizedNotes);
             setEditingNotes(false);
         } catch (error) {
             console.error('Error saving notes:', error);
@@ -376,10 +387,10 @@ export default function ProfessionalPatientsPage() {
                                                 <div className="text-right">
                                                     <span
                                                         className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${apt.status === 'completed'
-                                                                ? 'bg-green-100 text-green-800'
-                                                                : apt.status === 'cancelled'
-                                                                    ? 'bg-red-100 text-red-800'
-                                                                    : 'bg-amber-100 text-amber-800'
+                                                            ? 'bg-green-100 text-green-800'
+                                                            : apt.status === 'cancelled'
+                                                                ? 'bg-red-100 text-red-800'
+                                                                : 'bg-amber-100 text-amber-800'
                                                             }`}
                                                     >
                                                         {apt.status === 'completed' ? 'Completada' : apt.status === 'cancelled' ? 'Cancelada' : 'Pendiente'}
