@@ -37,6 +37,16 @@ const DAYS_ES = {
     sunday: "Domingo",
 };
 
+const ORDERED_DAYS: (keyof WeekAvailability)[] = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+];
+
 const DEFAULT_AVAILABILITY: WeekAvailability = {
     monday: { enabled: true, slots: [{ start: "09:00", end: "17:00" }] },
     tuesday: { enabled: true, slots: [{ start: "09:00", end: "17:00" }] },
@@ -238,12 +248,12 @@ export default function DisponibilidadPage() {
                 </h2>
 
                 <div className="space-y-4">
-                    {(Object.keys(availability) as Array<keyof WeekAvailability>).map((day) => (
+                    {ORDERED_DAYS.map((day) => (
                         <div
                             key={day}
                             className={`border rounded-lg p-4 transition-all ${availability[day].enabled
-                                    ? "border-primary bg-primary/5"
-                                    : "border-neutral-200 bg-neutral-50"
+                                ? "border-primary bg-primary/5"
+                                : "border-neutral-200 bg-neutral-50"
                                 }`}
                         >
                             <div className="flex items-center justify-between mb-3">
