@@ -220,8 +220,10 @@ export default function CalendarPage() {
         }
 
         setCreating(true);
+        console.log("Creating appointment...", { selectedSlot, newAppointment, userId: user.uid });
+
         try {
-            await addDoc(collection(db, "appointments"), {
+            const docRef = await addDoc(collection(db, "appointments"), {
                 professionalId: user.uid,
                 patientName: newAppointment.patientName,
                 patientEmail: newAppointment.patientEmail || "",
@@ -234,6 +236,8 @@ export default function CalendarPage() {
                 createdAt: Timestamp.now(),
                 createdBy: 'professional'
             });
+
+            console.log("Appointment created successfully with ID:", docRef.id);
 
             // Refresh appointments
             await fetchAppointments(user.uid);
@@ -250,9 +254,11 @@ export default function CalendarPage() {
             });
 
             alert("✅ Turno creado correctamente");
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error creating appointment:", error);
-            alert("❌ Error al crear el turno");
+            console.error("Error code:", error.code);
+            console.error("Error message:", error.message);
+            alert(`❌ Error al crear el turno: ${error.message || error}`);
         } finally {
             setCreating(false);
         }
