@@ -1,55 +1,9 @@
-"use client";
-
-import { useEffect } from "react";
-import Script from "next/script";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 
 export default function PostulacionPage() {
-    useEffect(() => {
-        const initForm = () => {
-            // @ts-ignore
-            if (window.hbspt) {
-                // @ts-ignore
-                window.hbspt.forms.create({
-                    region: "na1",
-                    portalId: "50445947",
-                    formId: "ef5165d6-caf7-4dd5-a11b-3382a8ce86ae",
-                    target: "#hubspot-form"
-                });
-            }
-        };
-
-        // Si el script ya cargó, inicializar. Si no, esperar al onLoad de Next/Script.
-        // @ts-ignore
-        if (window.hbspt) {
-            initForm();
-        }
-    }, []);
-
-    const handleScriptLoad = () => {
-        // @ts-ignore
-        if (window.hbspt) {
-            // Un pequeño delay para asegurar que el DOM esté listo
-            setTimeout(() => {
-                // @ts-ignore
-                window.hbspt.forms.create({
-                    region: "na1",
-                    portalId: "50445947",
-                    formId: "ef5165d6-caf7-4dd5-a11b-3382a8ce86ae",
-                    target: "#hubspot-form"
-                });
-            }, 500);
-        }
-    };
-
     return (
         <div className="min-h-screen bg-white font-sans text-text-primary">
-            <Script
-                src="https://js.hsforms.net/forms/embed/v2.js"
-                strategy="afterInteractive"
-                onLoad={handleScriptLoad}
-            />
             <Navbar />
 
             <section className="pt-24 pb-32 bg-background relative overflow-hidden">
@@ -71,14 +25,15 @@ export default function PostulacionPage() {
                         </p>
                     </div>
 
-                    <div className="bg-white rounded-3xl shadow-2xl border border-neutral-100 p-8 md:p-12 min-h-[600px] transform transition-all">
-                        {/* Placeholder mientras carga el form */}
-                        <div id="hubspot-form" className="w-full">
-                            <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                                <p className="text-text-secondary font-medium">Cargando formulario de postulación...</p>
-                            </div>
-                        </div>
+                    <div className="bg-white rounded-3xl shadow-2xl border border-neutral-100 overflow-hidden transform transition-all">
+                        <iframe
+                            src="https://share.hsforms.com/2EIr9tpH9RsqAkW8I0o9IjAu18cb"
+                            width="100%"
+                            height="800"
+                            frameBorder="0"
+                            className="w-full"
+                            title="Formulario de Postulación SmartWell"
+                        />
                     </div>
 
                     <div className="mt-12 text-center text-text-secondary space-y-2">
