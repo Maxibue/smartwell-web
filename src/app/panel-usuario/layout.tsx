@@ -39,16 +39,21 @@ export default function UserLayout({
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
-            const hasGuestBookings = typeof window !== 'undefined' && localStorage.getItem("guest_bookings");
 
-            if (!currentUser && hasGuestBookings) {
-                setIsGuest(true);
-            } else if (!currentUser) {
-                // No user, no guest bookings -> redirect
-                // router.push("/login?redirect=/panel-usuario");
-                // Actually, let's allow "empty" panel state or redirect? 
-                // Sticking to previous logic: if no user AND no guest data, redirect.
-                router.push("/login?redirect=/panel-usuario");
+            // ✅ MEJORADO: Solo redirigir si definitivamente NO hay usuario
+            if (!currentUser) {
+                const hasGuestBookings = typeof window !== 'undefined' && localStorage.getItem("guest_bookings");
+
+                if (hasGuestBookings) {
+                    // Usuario invitado con turnos guardados
+                    setIsGuest(true);
+                } else {
+                    // Sin usuario Y sin datos de invitado → redirigir a login
+                    router.push("/login?redirect=/panel-usuario");
+                }
+            } else {
+                // Usuario autenticado correctamente
+                setIsGuest(false);
             }
 
             setLoading(false);
@@ -58,12 +63,20 @@ export default function UserLayout({
 
     const handleLogout = async () => {
         await signOut(auth);
-        // Optional: Clear guest data on explicit logout? Maybe not.
-        // localStorage.removeItem("guest_bookings"); 
         router.push("/");
     };
 
-    if (loading) return <div className="min-h-screen bg-neutral-50 flex items-center justify-center">Cargando...</div>;
+    // ✅ Mostrar estado de carga más agradable mientras verificamos autenticación
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-text-secondary">Cargando...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-neutral-50 flex flex-col md:flex-row">
