@@ -2,35 +2,41 @@
 
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, getDoc, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, getDoc, addDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { Loader2, Search, FileText, Calendar, DollarSign, Edit2, Save, X, Plus } from 'lucide-react';
+import { Loader2, Search, FileText, Calendar, DollarSign, Edit2, Save, X, Plus, Clock, Phone, Mail, User as UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { sanitizeHTML, detectXSS } from '@/lib/sanitize';
 
-interface Patient {
+interface SessionRecord {
     id: string;
-    name: string;
-    email: string;
-    totalSessions: number;
-    completedSessions: number;
-    totalSpent: number;
-    lastSession: string;
+    date: string;
+    time: string;
+    service: string;
+    duration: number;
+    status: string;
+    price: number;
     notes?: string;
-    appointments: any[];
+    createdBy?: string;
 }
 
-interface PatientNote {
-    id: string;
-    patientId: string;
-    professionalId: string;
-    appointmentId?: string;
-    content: string;
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
+interface Patient {
+    id: string;         // unique key for grouping
+    name: string;
+    email: string;
+    phone?: string;
+    totalSessions: number;
+    completedSessions: number;
+    pendingSessions: number;
+    totalSpent: number;
+    lastSession: string;
+    firstSession: string;
+    notes?: string;
+    sessions: SessionRecord[];
+    isManual: boolean;   // whether created manually by the professional
 }
 
 export default function ProfessionalPatientsPage() {
@@ -62,7 +68,8 @@ export default function ProfessionalPatientsPage() {
         } else {
             const filtered = patients.filter(p =>
                 p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.email.toLowerCase().includes(searchTerm.toLowerCase())
+                p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (p.phone && p.phone.includes(searchTerm))
             );
             setFilteredPatients(filtered);
         }
@@ -79,43 +86,99 @@ export default function ProfessionalPatientsPage() {
             const querySnapshot = await getDocs(q);
             const patientMap = new Map<string, Patient>();
 
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                const patientId = data.userId;
+            querySnapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+
+                // Determine patient key - use patientId/userId if available, else use name+email
+                const patientName = data.patientName || data.userName || 'Paciente';
+                const patientEmail = data.patientEmail || data.userEmail || '';
+                const patientPhone = data.patientPhone || data.phone || '';
+                const patientId = data.userId || data.patientId || `manual_${patientName.toLowerCase().replace(/\s+/g, '_')}_${patientEmail}`;
+                const isManual = data.isManual || data.createdBy === 'professional' || !data.userId;
 
                 if (!patientMap.has(patientId)) {
                     patientMap.set(patientId, {
                         id: patientId,
-                        name: data.userName || 'Paciente',
-                        email: data.userEmail || '',
+                        name: patientName,
+                        email: patientEmail,
+                        phone: patientPhone,
                         totalSessions: 0,
                         completedSessions: 0,
+                        pendingSessions: 0,
                         totalSpent: 0,
-                        lastSession: data.date,
-                        appointments: [],
+                        lastSession: data.date || '',
+                        firstSession: data.date || '',
+                        sessions: [],
+                        isManual: isManual,
                     });
                 }
 
                 const patient = patientMap.get(patientId)!;
+
+                // Update contact info if we have better data
+                if (patientName !== 'Paciente' && patient.name === 'Paciente') {
+                    patient.name = patientName;
+                }
+                if (patientEmail && !patient.email) {
+                    patient.email = patientEmail;
+                }
+                if (patientPhone && !patient.phone) {
+                    patient.phone = patientPhone;
+                }
+
                 patient.totalSessions++;
-                patient.appointments.push({ id: doc.id, ...data });
+
+                // Build session record
+                const session: SessionRecord = {
+                    id: docSnap.id,
+                    date: data.date || '',
+                    time: data.time || '',
+                    service: data.service || data.serviceName || data.treatmentType || 'Consulta',
+                    duration: data.duration || 60,
+                    status: data.status || 'confirmed',
+                    price: data.price || data.servicePrice || 0,
+                    notes: data.notes || '',
+                    createdBy: data.createdBy || 'patient',
+                };
+
+                patient.sessions.push(session);
 
                 if (data.status === 'completed') {
                     patient.completedSessions++;
-                    patient.totalSpent += data.price || 0;
+                    patient.totalSpent += session.price;
+                }
+                if (data.status === 'confirmed') {
+                    patient.completedSessions++;
+                    patient.totalSpent += session.price;
+                }
+                if (data.status === 'pending') {
+                    patient.pendingSessions++;
                 }
 
-                if (data.date > patient.lastSession) {
+                if (data.date && data.date > patient.lastSession) {
                     patient.lastSession = data.date;
+                }
+                if (data.date && (data.date < patient.firstSession || !patient.firstSession)) {
+                    patient.firstSession = data.date;
                 }
             });
 
             // Load notes for each patient
             for (const [patientId, patient] of patientMap.entries()) {
-                const notesDoc = await getDoc(doc(db, 'patientNotes', `${uid}_${patientId}`));
-                if (notesDoc.exists()) {
-                    patient.notes = notesDoc.data().content || '';
+                try {
+                    const noteId = `${uid}_${patientId}`;
+                    const notesDoc = await getDoc(doc(db, 'patientNotes', noteId));
+                    if (notesDoc.exists()) {
+                        patient.notes = notesDoc.data().content || '';
+                    }
+                } catch (e) {
+                    // Ignore notes errors
                 }
+            }
+
+            // Sort sessions within each patient
+            for (const patient of patientMap.values()) {
+                patient.sessions.sort((a, b) => b.date.localeCompare(a.date));
             }
 
             const patientsArray = Array.from(patientMap.values()).sort((a, b) =>
@@ -140,36 +203,24 @@ export default function ProfessionalPatientsPage() {
     const handleSaveNotes = async () => {
         if (!user || !selectedPatient) return;
 
-        // ✅ SEGURIDAD: Detectar XSS
         if (detectXSS(notes)) {
-            alert("⚠️ Se detectó contenido sospechoso en las notas. Evitá usar caracteres especiales como <script>, javascript:, etc.");
+            alert("⚠️ Se detectó contenido sospechoso en las notas.");
             return;
         }
 
         setSavingNotes(true);
         try {
-            // ✅ SEGURIDAD: Sanitizar notas
             const sanitizedNotes = sanitizeHTML(notes);
-
             const noteId = `${user.uid}_${selectedPatient.id}`;
             const noteRef = doc(db, 'patientNotes', noteId);
 
-            await updateDoc(noteRef, {
+            await setDoc(noteRef, {
+                patientId: selectedPatient.id,
+                professionalId: user.uid,
                 content: sanitizedNotes,
                 updatedAt: Timestamp.now(),
-            }).catch(async () => {
-                // If document doesn't exist, create it
-                await addDoc(collection(db, 'patientNotes'), {
-                    id: noteId,
-                    patientId: selectedPatient.id,
-                    professionalId: user.uid,
-                    content: sanitizedNotes,
-                    createdAt: Timestamp.now(),
-                    updatedAt: Timestamp.now(),
-                });
-            });
+            }, { merge: true });
 
-            // Update local state with sanitized notes
             const updatedPatients = patients.map(p =>
                 p.id === selectedPatient.id ? { ...p, notes: sanitizedNotes } : p
             );
@@ -179,8 +230,47 @@ export default function ProfessionalPatientsPage() {
             setEditingNotes(false);
         } catch (error) {
             console.error('Error saving notes:', error);
+            alert('Error al guardar las notas');
         } finally {
             setSavingNotes(false);
+        }
+    };
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'completed': return 'Completada';
+            case 'confirmed': return 'Confirmada';
+            case 'pending': return 'Pendiente';
+            case 'cancelled': return 'Cancelada';
+            default: return status;
+        }
+    };
+
+    const getStatusStyle = (status: string) => {
+        switch (status) {
+            case 'completed': return 'bg-green-100 text-green-800';
+            case 'confirmed': return 'bg-primary/10 text-primary-dark';
+            case 'pending': return 'bg-amber-100 text-amber-800';
+            case 'cancelled': return 'bg-red-100 text-red-800';
+            default: return 'bg-neutral-100 text-neutral-800';
+        }
+    };
+
+    const formatDateSafe = (dateStr: string) => {
+        try {
+            if (!dateStr) return 'Sin fecha';
+            return format(new Date(dateStr + 'T00:00:00'), "d 'de' MMMM, yyyy", { locale: es });
+        } catch {
+            return dateStr;
+        }
+    };
+
+    const formatDayName = (dateStr: string) => {
+        try {
+            if (!dateStr) return '';
+            return format(new Date(dateStr + 'T00:00:00'), "EEEE", { locale: es });
+        } catch {
+            return '';
         }
     };
 
@@ -195,9 +285,17 @@ export default function ProfessionalPatientsPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-secondary">Gestión de Pacientes</h1>
-                <p className="text-text-secondary">Historial, notas y seguimiento de tus pacientes</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-secondary">Gestión de Pacientes</h1>
+                    <p className="text-text-secondary">Historial, notas y seguimiento de tus pacientes</p>
+                </div>
+                <div className="flex gap-3">
+                    <div className="bg-white px-4 py-2 rounded-lg border border-neutral-100 shadow-sm text-center">
+                        <p className="text-xs text-text-muted uppercase font-semibold">Total Pacientes</p>
+                        <p className="text-xl font-bold text-secondary">{patients.length}</p>
+                    </div>
+                </div>
             </div>
 
             {/* Search */}
@@ -205,7 +303,7 @@ export default function ProfessionalPatientsPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-text-muted" />
                 <Input
                     type="text"
-                    placeholder="Buscar paciente por nombre o email..."
+                    placeholder="Buscar paciente por nombre, email o teléfono..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -222,7 +320,9 @@ export default function ProfessionalPatientsPage() {
                     <div className="divide-y divide-neutral-100 max-h-[600px] overflow-y-auto">
                         {filteredPatients.length === 0 ? (
                             <div className="p-8 text-center text-text-muted">
-                                No se encontraron pacientes
+                                <UserIcon className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                <p>No se encontraron pacientes</p>
+                                <p className="text-xs mt-1">Creá turnos desde el calendario para agregar pacientes</p>
                             </div>
                         ) : (
                             filteredPatients.map((patient) => (
@@ -234,11 +334,26 @@ export default function ProfessionalPatientsPage() {
                                 >
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-semibold text-secondary truncate">{patient.name}</p>
-                                            <p className="text-xs text-text-secondary truncate">{patient.email}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-semibold text-secondary truncate">{patient.name}</p>
+                                                {patient.isManual && (
+                                                    <span className="text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded-full shrink-0">Manual</span>
+                                                )}
+                                            </div>
+                                            {patient.email && (
+                                                <p className="text-xs text-text-secondary truncate">{patient.email}</p>
+                                            )}
+                                            {patient.phone && (
+                                                <p className="text-xs text-text-muted truncate">{patient.phone}</p>
+                                            )}
                                             <div className="flex items-center gap-3 mt-2 text-xs text-text-muted">
-                                                <span>{patient.totalSessions} sesiones</span>
-                                                <span>${patient.totalSpent.toLocaleString()}</span>
+                                                <span className="flex items-center gap-1">
+                                                    <Calendar className="h-3 w-3" />
+                                                    {patient.totalSessions} {patient.totalSessions === 1 ? 'sesión' : 'sesiones'}
+                                                </span>
+                                                {patient.totalSpent > 0 && (
+                                                    <span>${patient.totalSpent.toLocaleString()}</span>
+                                                )}
                                             </div>
                                         </div>
                                         {patient.notes && (
@@ -255,16 +370,35 @@ export default function ProfessionalPatientsPage() {
                 <div className="lg:col-span-2 space-y-6">
                     {!selectedPatient ? (
                         <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-12 text-center">
+                            <UserIcon className="h-12 w-12 mx-auto mb-3 text-text-muted opacity-30" />
                             <p className="text-text-muted">Seleccioná un paciente para ver su información</p>
                         </div>
                     ) : (
                         <>
-                            {/* Patient Info */}
+                            {/* Patient Info Card */}
                             <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-6">
                                 <div className="flex items-start justify-between mb-6">
                                     <div>
-                                        <h2 className="text-xl font-bold text-secondary">{selectedPatient.name}</h2>
-                                        <p className="text-text-secondary">{selectedPatient.email}</p>
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="text-xl font-bold text-secondary">{selectedPatient.name}</h2>
+                                            {selectedPatient.isManual && (
+                                                <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">Paciente Manual</span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-4 mt-1 text-sm text-text-secondary">
+                                            {selectedPatient.email && (
+                                                <span className="flex items-center gap-1">
+                                                    <Mail className="h-3.5 w-3.5" />
+                                                    {selectedPatient.email}
+                                                </span>
+                                            )}
+                                            {selectedPatient.phone && (
+                                                <span className="flex items-center gap-1">
+                                                    <Phone className="h-3.5 w-3.5" />
+                                                    {selectedPatient.phone}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -280,9 +414,17 @@ export default function ProfessionalPatientsPage() {
                                     <div className="bg-green-50 p-4 rounded-lg">
                                         <div className="flex items-center gap-2 text-green-600 mb-1">
                                             <Calendar className="h-4 w-4" />
-                                            <p className="text-xs font-medium">Completadas</p>
+                                            <p className="text-xs font-medium">Confirmadas</p>
                                         </div>
                                         <p className="text-2xl font-bold text-green-900">{selectedPatient.completedSessions}</p>
+                                    </div>
+
+                                    <div className="bg-amber-50 p-4 rounded-lg">
+                                        <div className="flex items-center gap-2 text-amber-600 mb-1">
+                                            <Clock className="h-4 w-4" />
+                                            <p className="text-xs font-medium">Pendientes</p>
+                                        </div>
+                                        <p className="text-2xl font-bold text-amber-900">{selectedPatient.pendingSessions}</p>
                                     </div>
 
                                     <div className="bg-purple-50 p-4 rounded-lg">
@@ -292,16 +434,20 @@ export default function ProfessionalPatientsPage() {
                                         </div>
                                         <p className="text-2xl font-bold text-purple-900">${selectedPatient.totalSpent.toLocaleString()}</p>
                                     </div>
+                                </div>
 
-                                    <div className="bg-orange-50 p-4 rounded-lg">
-                                        <div className="flex items-center gap-2 text-orange-600 mb-1">
-                                            <Calendar className="h-4 w-4" />
-                                            <p className="text-xs font-medium">Última Sesión</p>
+                                {/* First/Last Session Info */}
+                                <div className="flex gap-4 mt-4 text-sm">
+                                    {selectedPatient.firstSession && (
+                                        <div className="text-text-muted">
+                                            <span className="font-medium">Primera sesión:</span> {formatDateSafe(selectedPatient.firstSession)}
                                         </div>
-                                        <p className="text-sm font-bold text-orange-900">
-                                            {format(new Date(selectedPatient.lastSession), 'dd MMM', { locale: es })}
-                                        </p>
-                                    </div>
+                                    )}
+                                    {selectedPatient.lastSession && (
+                                        <div className="text-text-muted">
+                                            <span className="font-medium">Última sesión:</span> {formatDateSafe(selectedPatient.lastSession)}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -357,7 +503,7 @@ export default function ProfessionalPatientsPage() {
                                         className="w-full h-48 px-4 py-3 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                                     />
                                 ) : (
-                                    <div className="bg-neutral-50 rounded-lg p-4 min-h-[200px]">
+                                    <div className="bg-neutral-50 rounded-lg p-4 min-h-[120px]">
                                         {notes ? (
                                             <p className="text-secondary whitespace-pre-wrap">{notes}</p>
                                         ) : (
@@ -367,39 +513,63 @@ export default function ProfessionalPatientsPage() {
                                 )}
                             </div>
 
-                            {/* Appointment History */}
+                            {/* Session History */}
                             <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-6">
-                                <h3 className="font-bold text-secondary mb-4">Historial de Sesiones</h3>
-                                <div className="space-y-3">
-                                    {selectedPatient.appointments
-                                        .sort((a, b) => b.date.localeCompare(a.date))
-                                        .map((apt) => (
+                                <h3 className="font-bold text-secondary mb-4 flex items-center gap-2">
+                                    <Calendar className="h-5 w-5" />
+                                    Historial de Sesiones ({selectedPatient.sessions.length})
+                                </h3>
+
+                                {selectedPatient.sessions.length === 0 ? (
+                                    <div className="text-center py-8 text-text-muted">
+                                        <Calendar className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                        <p>No hay sesiones registradas</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {selectedPatient.sessions.map((session) => (
                                             <div
-                                                key={apt.id}
-                                                className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg"
+                                                key={session.id}
+                                                className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
                                             >
-                                                <div>
-                                                    <p className="font-semibold text-secondary">
-                                                        {format(new Date(apt.date), "EEEE, d 'de' MMMM", { locale: es })}
-                                                    </p>
-                                                    <p className="text-sm text-text-secondary">{apt.time} hs • {apt.professionalSpecialty}</p>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-semibold text-secondary">
+                                                            {formatDateSafe(session.date)}
+                                                        </p>
+                                                        <span className="text-xs text-text-muted capitalize">
+                                                            {formatDayName(session.date)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 mt-1 text-sm text-text-secondary">
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock className="h-3 w-3" />
+                                                            {session.time} hs
+                                                        </span>
+                                                        <span>•</span>
+                                                        <span>{session.service}</span>
+                                                        <span>•</span>
+                                                        <span>{session.duration} min</span>
+                                                    </div>
+                                                    {session.notes && (
+                                                        <p className="text-xs text-text-muted mt-1 italic">"{session.notes}"</p>
+                                                    )}
                                                 </div>
-                                                <div className="text-right">
-                                                    <span
-                                                        className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${apt.status === 'completed'
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : apt.status === 'cancelled'
-                                                                ? 'bg-red-100 text-red-800'
-                                                                : 'bg-amber-100 text-amber-800'
-                                                            }`}
-                                                    >
-                                                        {apt.status === 'completed' ? 'Completada' : apt.status === 'cancelled' ? 'Cancelada' : 'Pendiente'}
+                                                <div className="text-right ml-4">
+                                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(session.status)}`}>
+                                                        {getStatusLabel(session.status)}
                                                     </span>
-                                                    <p className="text-sm font-bold text-secondary mt-1">${apt.price}</p>
+                                                    {session.price > 0 && (
+                                                        <p className="text-sm font-bold text-secondary mt-1">${session.price}</p>
+                                                    )}
+                                                    {session.createdBy === 'professional' && (
+                                                        <p className="text-xs text-text-muted mt-0.5">Turno manual</p>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
