@@ -9,7 +9,7 @@ import { Loader2, ArrowLeft, Calendar as CalendarIcon, Clock, DollarSign, User a
 import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, doc, query, where } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { format, parseISO, isValid } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 interface Service {
@@ -76,34 +76,41 @@ export default function ManualBookingPage() {
             const selectedService = services.find(s => s.id === selectedServiceId);
             if (!selectedService) return;
 
-            // Generate Booking Data
-            const bookingData = {
+            // Generate Appointment Data (matching calendar format)
+            const appointmentData = {
                 professionalId: user.uid,
+                patientId: null, // No registered patient
+                patientName: formData.patientName,
+                patientEmail: formData.patientEmail || "",
+                patientPhone: formData.patientPhone || "",
+                service: selectedService.name,
                 serviceId: selectedService.id,
-                serviceName: selectedService.name,
-                servicePrice: selectedService.price,
+                price: selectedService.price,
                 date: formData.date,
                 time: formData.time,
+                duration: selectedService.duration,
                 status: "confirmed", // Auto-confirmed since added by pro
-                paymentStatus: "manual", // Assume cash/transfer/pre-paid
+                paymentStatus: "pending",
                 createdAt: new Date(),
-                isManual: true,
-                user: {
-                    name: formData.patientName,
-                    email: formData.patientEmail || "no-email@manual.com", // Fallback for query simplicity
-                    phone: formData.patientPhone || ""
-                },
-                patientId: null // No registered patient ID
+                createdBy: "professional",
+                isManual: true
             };
 
-            await addDoc(collection(db, "bookings"), bookingData);
+            console.log("Creating manual appointment:", appointmentData);
 
-            // Redirect back to dashboard with success (or show toast, but redirect is simple)
-            router.push("/panel-profesional");
+            await addDoc(collection(db, "appointments"), appointmentData);
 
-        } catch (error) {
+            console.log("Appointment created successfully");
+            alert("✅ Turno creado correctamente");
+
+            // Redirect back to calendar
+            router.push("/panel-profesional/calendario");
+
+        } catch (error: any) {
             console.error("Error creating manual booking:", error);
-            alert("Error al crear la reserva. Intente nuevamente.");
+            console.error("Error code:", error.code);
+            console.error("Error message:", error.message);
+            alert(`❌ Error al crear la reserva: ${error.message || "Intente nuevamente"}`);
         } finally {
             setSubmitting(false);
         }
