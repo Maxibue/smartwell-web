@@ -65,10 +65,23 @@ service cloud.firestore {
     
     // Appointments collection
     match /appointments/{appointmentId} {
-      // Cualquier usuario autenticado puede leer appointments para verificar
-      // disponibilidad en el flujo de reserva (qué horarios están ocupados).
-      // La escritura/modificación sigue restringida al dueño o profesional.
-      allow read: if isAuthenticated();
+      // Lectura pública: necesaria para verificar disponibilidad en el flujo de reserva.
+      // Los horarios ocupados no son datos sensibles (solo fecha+hora+profesional).
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.professionalId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+    
+    // Bookings collection (reservas hechas por pacientes desde el flujo público)
+    match /bookings/{bookingId} {
+      // Lectura pública: necesaria para verificar disponibilidad.
+      allow read: if true;
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (
         resource.data.patientId == request.auth.uid ||
