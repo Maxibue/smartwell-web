@@ -28,6 +28,11 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# Firebase service account (NEVER commit these!)
+serviceAccountKey.json
+*firebase-adminsdk*.json
+smartwell-v2-*.json
+
 # vercel
 .vercel
 

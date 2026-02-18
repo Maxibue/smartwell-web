@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-helpers';
 import { withRateLimit, RateLimitPresets } from '@/lib/rate-limit';
-import { logAdminAction, AdminActions } from '@/lib/audit-log';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { AdminActions } from '@/lib/audit-log';
+import { getAdminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(
     request: NextRequest,
     { params }: { params: { professionalId: string } }
 ) {
+    console.log('🔵 [API] /api/admin/professionals/[id]/reject called');
+
     try {
         // 1. Rate Limiting
+        console.log('🟡 [API] Checking rate limit...');
         const rateLimitCheck = withRateLimit(RateLimitPresets.admin)(request);
         if (!rateLimitCheck.allowed) {
+            console.log('❌ [API] Rate limit exceeded');
             return NextResponse.json(
                 { error: 'Demasiadas solicitudes. Intenta nuevamente más tarde.' },
                 {
@@ -21,60 +25,89 @@ export async function POST(
                 }
             );
         }
+        console.log('✅ [API] Rate limit passed');
 
         // 2. Verificar que es admin
+        console.log('🟡 [API] Checking admin role...');
         const adminUid = await requireAdmin(request);
         if (!adminUid) {
+            console.log('❌ [API] Not authorized - not an admin');
             return NextResponse.json(
                 { error: 'No autorizado. Se requieren permisos de administrador.' },
                 { status: 401 }
             );
         }
+        console.log('✅ [API] Admin check passed, uid:', adminUid);
+
         const { professionalId } = params;
+        console.log('🟡 [API] Professional ID:', professionalId);
+
+        if (!professionalId) {
+            console.log('❌ [API] Invalid professional ID');
+            return NextResponse.json(
+                { error: 'ID de profesional inválido.' },
+                { status: 400 }
+            );
+        }
 
         // 3. Verificar que el profesional existe
-        const professionalRef = doc(db, 'professionals', professionalId);
-        const professionalSnap = await getDoc(professionalRef);
+        console.log('🟡 [API] Checking if professional exists...');
+        const dbAdmin = getAdminDb();
+        const professionalRef = dbAdmin.collection('professionals').doc(professionalId);
+        const professionalSnap = await professionalRef.get();
 
-        if (!professionalSnap.exists()) {
+        if (!professionalSnap.exists) {
+            console.log('❌ [API] Professional not found:', professionalId);
             return NextResponse.json(
                 { error: 'Profesional no encontrado.' },
                 { status: 404 }
             );
         }
+        console.log('✅ [API] Professional found');
 
         const professionalData = professionalSnap.data();
-        const previousStatus = professionalData.status;
+        const previousStatus = professionalData?.status;
+        console.log('🟡 [API] Current status:', previousStatus);
 
         // 4. Actualizar estado a rechazado
-        await updateDoc(professionalRef, {
+        console.log('🟡 [API] Updating professional status to rejected...');
+        await professionalRef.update({
             status: 'rejected',
-            reviewedAt: new Date(),
+            reviewedAt: FieldValue.serverTimestamp(),
             reviewedBy: adminUid,
+            updatedAt: FieldValue.serverTimestamp()
         });
+        console.log('✅ [API] Professional status updated');
 
         // 5. Obtener email del admin para el log
-        const adminDoc = await getDoc(doc(db, 'users', adminUid));
-        const adminEmail = adminDoc.exists() ? adminDoc.data()?.email : 'unknown';
+        console.log('🟡 [API] Getting admin email...');
+        const adminDoc = await dbAdmin.collection('users').doc(adminUid).get();
+        const adminEmail = adminDoc.exists ? adminDoc.data()?.email : 'unknown';
+        console.log('🟡 [API] Admin email:', adminEmail);
 
         // 6. Registrar en audit log
-        await logAdminAction(
-            adminUid,
-            adminEmail,
-            AdminActions.REJECT_PROFESSIONAL,
-            professionalId,
-            'professional',
-            {
-                previousStatus,
-                newStatus: 'rejected',
-                professionalName: professionalData.name,
-                professionalEmail: professionalData.email,
-            }
-        );
+        try {
+            console.log('🟡 [API] Creating audit log...');
+            await dbAdmin.collection('audit_logs').add({
+                timestamp: FieldValue.serverTimestamp(),
+                adminUid,
+                adminEmail: adminEmail || 'unknown',
+                action: AdminActions.REJECT_PROFESSIONAL,
+                targetId: professionalId,
+                targetType: 'professional',
+                details: {
+                    previousStatus: previousStatus || null,
+                    newStatus: 'rejected',
+                    professionalName: professionalData?.name || 'Unknown',
+                    professionalEmail: professionalData?.email || 'Unknown',
+                },
+            });
+            console.log('✅ [API] Audit log created');
+        } catch (logError) {
+            console.error("❌ [API] Error logging admin action:", logError);
+        }
 
-        // 7. TODO: Enviar email al profesional notificando el rechazo
-        // await sendRejectionEmail(professionalData.email, professionalData.name);
-
+        console.log('✅ [API] Returning success response');
         return NextResponse.json({
             success: true,
             message: 'Profesional rechazado correctamente.',
@@ -84,10 +117,11 @@ export async function POST(
             }
         });
 
-    } catch (error) {
-        console.error('Error rejecting professional:', error);
+    } catch (error: any) {
+        console.error('❌ [API] Error rejecting professional:', error);
+        console.error('❌ [API] Error stack:', error.stack);
         return NextResponse.json(
-            { error: 'Error interno del servidor.' },
+            { error: error.message || 'Error interno del servidor.' },
             { status: 500 }
         );
     }

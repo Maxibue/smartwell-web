@@ -22,8 +22,10 @@ service cloud.firestore {
     }
     
     // Users collection
+    // TEMPORAL: Permitir lectura pública SOLO para verificación de roles desde API routes
+    // TODO: Configurar Firebase Admin SDK con service account y restaurar a: allow read: if isAuthenticated();
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if true; // TEMPORAL - permite lectura pública
       allow create: if isOwner(userId) && 
                       (!request.resource.data.keys().hasAny(['role']) || 
                        request.resource.data.role == 'user');

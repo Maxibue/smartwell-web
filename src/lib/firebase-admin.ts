@@ -1,14 +1,23 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
 let adminApp: App | null = null;
 let adminAuthInstance: Auth | null = null;
+let adminFirestoreInstance: Firestore | null = null;
+let initializationFailed = false;
 
 /**
  * Inicializa Firebase Admin SDK de forma lazy (solo cuando se necesita)
  * Esto previene errores durante el build de Next.js
+ * RETORNA NULL si falla la inicialización (para permitir fallbacks)
  */
-function initializeAdminApp(): App {
+function initializeAdminApp(): App | null {
+    // Si ya falló antes, no reintentar
+    if (initializationFailed) {
+        return null;
+    }
+
     if (adminApp) {
         return adminApp;
     }
@@ -20,51 +29,94 @@ function initializeAdminApp(): App {
         return adminApp;
     }
 
-    // Configuración del Service Account
-    // En producción (Vercel), usar variables de entorno individuales
-    // En desarrollo, puede usar FIREBASE_SERVICE_ACCOUNT JSON completo
-    let credential;
+    try {
+        // Configuración del Service Account
+        let credential;
 
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        // Opción 1: JSON completo del service account
+        // Opción 1: Archivo JSON local (para desarrollo)
         try {
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-            credential = cert(serviceAccount);
-        } catch (error) {
-            console.error('Error parsing FIREBASE_SERVICE_ACCOUNT:', error);
-            throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT format');
+            const fs = require('fs');
+            const path = require('path');
+
+            // Intentar varios nombres de archivo posibles
+            const possiblePaths = [
+                path.join(process.cwd(), 'serviceAccountKey.json'),
+                path.join(process.cwd(), 'smartwell-v2-firebase-adminsdk-fbsvc-240ff888bf.json'),
+                path.join(process.cwd(), 'smartwell-v2-6ba2c4e6329f.json'),
+            ];
+
+            let serviceAccountPath = null;
+            for (const filePath of possiblePaths) {
+                if (fs.existsSync(filePath)) {
+                    serviceAccountPath = filePath;
+                    break;
+                }
+            }
+
+            if (serviceAccountPath) {
+                const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+                credential = cert(serviceAccount);
+                console.log('✅ Firebase Admin SDK using local service account file');
+            }
+        } catch (fileError) {
+            // Si falla lectura de archivo, continuar con otras opciones
+            console.log('ℹ️ No local service account file found, trying environment variables...');
         }
-    } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-        // Opción 2: Variables individuales (recomendado para Vercel)
-        credential = cert({
+
+        // Opción 2: Variable de entorno con JSON completo
+        if (!credential && process.env.FIREBASE_SERVICE_ACCOUNT) {
+            try {
+                const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+                credential = cert(serviceAccount);
+                console.log('✅ Firebase Admin SDK using FIREBASE_SERVICE_ACCOUNT env var');
+            } catch (error) {
+                console.warn('⚠️ Error parsing FIREBASE_SERVICE_ACCOUNT. Trying individual vars...');
+            }
+        }
+
+        // Opción 3: Variables individuales (recomendado para Vercel)
+        if (!credential && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+            credential = cert({
+                projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                // Vercel escapa los saltos de línea, necesitamos reemplazarlos
+                privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            });
+            console.log('✅ Firebase Admin SDK using individual environment variables');
+        }
+
+        // Si no hay credenciales disponibles, retornar null
+        if (!credential) {
+            console.warn('⚠️ No Firebase Admin credentials found. Admin SDK disabled. Using fallback methods.');
+            initializationFailed = true;
+            return null;
+        }
+
+        adminApp = initializeApp({
+            credential,
             projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            // Vercel escapa los saltos de línea, necesitamos reemplazarlos
-            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
         });
-    } else {
-        // Opción 3: Application Default Credentials (para desarrollo local)
-        // Firebase Admin intentará usar las credenciales del sistema
-        console.warn('No Firebase Admin credentials found. Using Application Default Credentials.');
-        // No especificamos credential, Firebase Admin usará ADC
-        credential = undefined;
+
+        console.log('✅ Firebase Admin SDK initialized successfully');
+        return adminApp;
+    } catch (error) {
+        console.error('❌ Failed to initialize Firebase Admin SDK:', error);
+        initializationFailed = true;
+        return null;
     }
-
-    adminApp = initializeApp({
-        credential,
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    });
-
-    return adminApp;
 }
 
 /**
  * Obtiene la instancia de Auth de Firebase Admin
  * Lazy loading para prevenir errores en build time
+ * LANZA ERROR si no está disponible (para que auth-helpers use fallback)
  */
 export function getAdminAuth(): Auth {
     if (!adminAuthInstance) {
         const app = initializeAdminApp();
+        if (!app) {
+            throw new Error('Firebase Admin SDK not available - credentials missing');
+        }
         adminAuthInstance = getAuth(app);
     }
     return adminAuthInstance;
@@ -77,5 +129,21 @@ export const adminAuth = {
         return auth.verifyIdToken(token);
     }
 };
+
+/**
+ * Obtiene la instancia de Firestore de Firebase Admin
+ * Lazy loading para prevenir errores en build time
+ * LANZA ERROR si no está disponible (para que auth-helpers use fallback)
+ */
+export function getAdminDb(): Firestore {
+    if (!adminFirestoreInstance) {
+        const app = initializeAdminApp();
+        if (!app) {
+            throw new Error('Firebase Admin SDK not available - credentials missing');
+        }
+        adminFirestoreInstance = getFirestore(app);
+    }
+    return adminFirestoreInstance;
+}
 
 export { adminApp };
