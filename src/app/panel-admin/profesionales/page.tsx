@@ -93,18 +93,32 @@ export default function ProfessionalesPage() {
     };
 
     const handleStatusChange = async (professionalId: string, newStatus: "approved" | "rejected") => {
+        console.log('🔵 handleStatusChange called!', { professionalId, newStatus, currentUser: !!currentUser });
+
         if (!currentUser) {
             alert("Debes estar autenticado para realizar esta acción.");
             return;
         }
 
-        const confirmed = confirm(
-            `¿Estás seguro que querés ${newStatus === "approved" ? "aprobar" : "rechazar"} este profesional?`
-        );
+        // TEMPORARY: Skip confirmation for debugging
+        // const confirmed = confirm(
+        //     `¿Estás seguro que querés ${newStatus === "approved" ? "aprobar" : "rechazar"} este profesional?`
+        // );
+        // if (!confirmed) return;
 
-        if (!confirmed) return;
+        console.log('🟡 Skipping confirm dialog for debugging...');
+
+        // ✅ VALIDAR que el usuario esté autenticado
+        if (!currentUser) {
+            console.error('❌ No hay usuario autenticado');
+            alert('Debes iniciar sesión para realizar esta acción.');
+            return;
+        }
+
+        console.log('✅ Usuario autenticado:', currentUser.email);
 
         try {
+            console.log('🟢 About to call API...', newStatus);
             // ✅ SEGURO: Usar API route protegida con audit logging
             if (newStatus === "approved") {
                 await approveProfessional(currentUser, professionalId);
@@ -115,7 +129,7 @@ export default function ProfessionalesPage() {
             alert(`Profesional ${newStatus === "approved" ? "aprobado" : "rechazado"} correctamente.`);
             fetchProfessionals();
         } catch (error: any) {
-            console.error("Error updating professional status:", error);
+            console.error("❌ Error updating professional status:", error);
             alert(error.message || "Hubo un error al actualizar el estado.");
         }
     };

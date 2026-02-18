@@ -140,7 +140,7 @@ export default function ProfilePage() {
                 image: sanitizedImage,
             }));
 
-            alert("Perfil actualizado correctamente.");
+            alert("✅ Perfil actualizado correctamente.");
         } catch (error) {
             console.error("Error updating profile:", error);
             alert("Hubo un error al guardar los cambios.");
@@ -242,21 +242,22 @@ export default function ProfilePage() {
                 <div className="md:col-span-1 space-y-6">
                     {/* Profile Image */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex flex-col items-center text-center">
-                        <div className="relative group cursor-pointer mb-4">
+                        <div
+                            className="relative mb-4"
+                        >
                             <img
                                 src={profile.image || `https://ui-avatars.com/api/?name=${profile.name}&background=random`}
                                 alt="Profile"
-                                className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-md"
+                                className={`w-36 h-36 rounded-full object-cover border-4 border-white shadow-md transition-opacity`}
                             />
-                            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Camera className="h-8 w-8 text-white" />
-                            </div>
                         </div>
+
                         <p className="text-xs text-text-muted mb-4">
-                            Hacé click para cambiar tu foto (Próximamente subida de archivos)
+                            Ingresá la URL de tu foto de perfil.
                         </p>
+
                         <div className="w-full">
-                            <Label htmlFor="image-url" className="text-left block mb-1">URL de Imagen (Temporal)</Label>
+                            <Label htmlFor="image-url" className="text-left block mb-1">URL de Imagen</Label>
                             <Input
                                 id="image-url"
                                 value={profile.image}
