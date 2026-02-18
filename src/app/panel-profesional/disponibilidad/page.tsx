@@ -153,13 +153,23 @@ export default function DisponibilidadPage() {
             return;
         }
 
-        // Validar que todos los slots tengan start < end
+        // Validar que todos los slots tengan start < end y no se superpongan
         for (const day of ORDERED_DAYS) {
             if (!availability[day].enabled) continue;
-            for (const slot of availability[day].slots) {
+            const slots = availability[day].slots;
+            for (let i = 0; i < slots.length; i++) {
+                const slot = slots[i];
                 if (slot.start >= slot.end) {
-                    setSaveError(`Horario inválido en ${DAYS_ES[day]}: ${slot.start} debe ser antes de ${slot.end}`);
+                    setSaveError(`Horario inválido en ${DAYS_ES[day]}: "${slot.start}" debe ser antes de "${slot.end}"`);
                     return;
+                }
+                // Verificar solapamiento con otros slots del mismo día
+                for (let j = i + 1; j < slots.length; j++) {
+                    const other = slots[j];
+                    if (slot.start < other.end && slot.end > other.start) {
+                        setSaveError(`Horarios superpuestos en ${DAYS_ES[day]}: ${slot.start}-${slot.end} y ${other.start}-${other.end}`);
+                        return;
+                    }
                 }
             }
         }
@@ -329,14 +339,17 @@ export default function DisponibilidadPage() {
                             {availability[day].enabled && (
                                 <div className="space-y-2 ml-8">
                                     {availability[day].slots.map((slot, index) => (
-                                        <div key={index} className="flex items-center gap-3">
+                                        <div key={index} className="flex items-center gap-3 flex-wrap">
                                             <input
                                                 type="time"
                                                 value={slot.start}
                                                 onChange={(e) =>
                                                     updateTimeSlot(day, index, "start", e.target.value)
                                                 }
-                                                className="px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                                className={`px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${slot.start >= slot.end
+                                                        ? "border-red-400 bg-red-50"
+                                                        : "border-neutral-200"
+                                                    }`}
                                             />
                                             <span className="text-text-secondary">a</span>
                                             <input
@@ -345,8 +358,17 @@ export default function DisponibilidadPage() {
                                                 onChange={(e) =>
                                                     updateTimeSlot(day, index, "end", e.target.value)
                                                 }
-                                                className="px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                                className={`px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${slot.start >= slot.end
+                                                        ? "border-red-400 bg-red-50"
+                                                        : "border-neutral-200"
+                                                    }`}
                                             />
+                                            {slot.start >= slot.end && (
+                                                <span className="text-xs text-red-600 font-medium">⚠ Inicio debe ser antes que fin</span>
+                                            )}
+                                            {slot.start < "06:00" && slot.start < slot.end && (
+                                                <span className="text-xs text-amber-600 font-medium">⚠ Horario de madrugada</span>
+                                            )}
                                             {availability[day].slots.length > 1 && (
                                                 <button
                                                     onClick={() => removeTimeSlot(day, index)}

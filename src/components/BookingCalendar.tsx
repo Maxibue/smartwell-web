@@ -208,9 +208,13 @@ export default function BookingCalendar({ professionalId, onSelectSlot }: Bookin
             const isToday = dateStr === todayStr;
             const nowMinutes = nowBA.getHours() * 60 + nowBA.getMinutes();
 
-            // Generar slots
+            // Generar slots — ordenar intervalos por hora de inicio y filtrar inválidos
+            const validSlots = [...dayAvailability.slots]
+                .filter(slot => slot.start < slot.end) // descartar slots con start >= end
+                .sort((a, b) => parseTime(a.start) - parseTime(b.start)); // ordenar por inicio
+
             const slots: AvailableSlot[] = [];
-            dayAvailability.slots.forEach((slot) => {
+            validSlots.forEach((slot) => {
                 const startMin = parseTime(slot.start);
                 const endMin = parseTime(slot.end);
                 let cur = startMin;
@@ -225,6 +229,7 @@ export default function BookingCalendar({ professionalId, onSelectSlot }: Bookin
                     cur += sessionDuration + bufferTime;
                 }
             });
+
 
             setAvailableSlots(slots);
         } catch (err) {
