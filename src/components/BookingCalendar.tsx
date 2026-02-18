@@ -210,7 +210,8 @@ export default function BookingCalendar({ professionalId, onSelectSlot }: Bookin
 
             // Generar slots — ordenar intervalos por hora de inicio y filtrar inválidos
             const validSlots = [...dayAvailability.slots]
-                .filter(slot => slot.start < slot.end) // descartar slots con start >= end
+                .filter(slot => slot.start < slot.end)           // descartar slots con start >= end
+                .filter(slot => parseTime(slot.start) >= 6 * 60) // descartar horarios de madrugada (antes de 06:00)
                 .sort((a, b) => parseTime(a.start) - parseTime(b.start)); // ordenar por inicio
 
             const slots: AvailableSlot[] = [];
