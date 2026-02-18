@@ -9,13 +9,12 @@ import {
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
-    collection, query, where, getDocs, orderBy,
+    collection, query, where, getDocs,
     doc, updateDoc, getDoc
 } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { format, isToday, parseISO, isFuture } from "date-fns";
-import { es } from "date-fns/locale";
 import Link from "next/link";
+
 
 // Estructura unificada para bookings y appointments
 interface Session {
@@ -43,6 +42,42 @@ function formatARS(n: number) {
         style: "currency", currency: "ARS", maximumFractionDigits: 0
     }).format(n);
 }
+
+// Helpers de fecha sin date-fns
+function parseDate(dateStr: string): Date {
+    // dateStr: "YYYY-MM-DD"
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return new Date(y, m - 1, d);
+}
+
+function isDateToday(dateStr: string): boolean {
+    const d = parseDate(dateStr);
+    const today = new Date();
+    return d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate();
+}
+
+function isDateFuture(dateStr: string, time: string): boolean {
+    const [h, min] = (time || "00:00").split(":").map(Number);
+    const d = parseDate(dateStr);
+    d.setHours(h, min, 0, 0);
+    return d > new Date();
+}
+
+const MONTH_NAMES_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const DAY_NAMES_SHORT = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
+function formatDateShort(dateStr: string): string {
+    const d = parseDate(dateStr);
+    return `${DAY_NAMES_SHORT[d.getDay()]} ${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
+}
+
+function formatDateMedium(dateStr: string): string {
+    const d = parseDate(dateStr);
+    return `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
+}
+
 
 export default function ProfessionalDashboard() {
     const [user, setUser] = useState<User | null>(null);
@@ -180,25 +215,25 @@ export default function ProfessionalDashboard() {
     // ── KPIs ────────────────────────────────────────────────────────────────
     const now = new Date();
     const todaySessions = sessions.filter(
-        (s) => s.status !== "cancelled" && s.date && isToday(parseISO(s.date))
+        (s) => s.status !== "cancelled" && s.date && isDateToday(s.date)
     );
     const upcomingSessions = sessions.filter(
-        (s) => s.status !== "cancelled" && s.date &&
-            isFuture(new Date(`${s.date}T${s.time || "00:00"}`))
+        (s) => s.status !== "cancelled" && s.date && isDateFuture(s.date, s.time)
     );
     const confirmedSessions = sessions.filter((s) => s.status === "confirmed");
     const pendingSessions = sessions.filter((s) => s.status === "pending");
     const monthRevenue = sessions
         .filter((s) => {
             if (s.status === "cancelled") return false;
-            const d = s.date ? parseISO(s.date) : null;
-            return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            if (!s.date) return false;
+            const d = parseDate(s.date);
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         })
         .reduce((sum, s) => sum + (s.price || 0), 0);
 
     const nextSession = upcomingSessions[0];
     const nextSessionLabel = nextSession
-        ? `${format(parseISO(nextSession.date), "dd/MM")} ${nextSession.time}`
+        ? `${formatDateMedium(nextSession.date)} ${nextSession.time}`
         : "-";
 
     // Pacientes únicos
@@ -352,7 +387,7 @@ export default function ProfessionalDashboard() {
                                                 <p className="font-semibold text-secondary text-sm">{s.patientName}</p>
                                                 <p className="text-xs text-text-muted">
                                                     {s.service}
-                                                    {s.date && ` · ${format(parseISO(s.date), "EEE d MMM", { locale: es })}`}
+                                                    {s.date && ` · ${formatDateShort(s.date)}`}
                                                     {s.time && ` ${s.time}hs`}
                                                 </p>
                                             </div>
@@ -403,7 +438,7 @@ export default function ProfessionalDashboard() {
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-xs font-semibold bg-white px-2 py-0.5 rounded border border-amber-200">
-                                                    {s.date ? format(parseISO(s.date), "d MMM", { locale: es }) : "-"}
+                                                    {s.date ? formatDateMedium(s.date) : "-"}
                                                 </p>
                                                 <p className="text-xs font-bold mt-0.5 text-secondary">{s.time}hs</p>
                                             </div>

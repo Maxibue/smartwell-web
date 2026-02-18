@@ -94,15 +94,22 @@ export default function CalendarPage() {
         return days;
     }
 
+    // Auth: solo una vez al montar
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                await fetchAppointments(currentUser.uid);
+                fetchAppointments(currentUser.uid);
+            } else {
+                setLoading(false);
             }
-            setLoading(false);
         });
         return () => unsubscribe();
+    }, []);
+
+    // Re-fetch cuando cambia la vista o el período
+    useEffect(() => {
+        if (user) fetchAppointments(user.uid);
     }, [currentWeekStart, currentDay, currentMonth, view]);
 
     const fetchAppointments = async (professionalId: string) => {
@@ -123,33 +130,61 @@ export default function CalendarPage() {
                 endDate = formatDate(monthDays[monthDays.length - 1]);
             }
 
-            const q = query(
-                collection(db, "appointments"),
-                where("professionalId", "==", professionalId),
-                where("date", ">=", startDate),
-                where("date", "<=", endDate)
-            );
+            const all: Appointment[] = [];
 
-            const querySnapshot = await getDocs(q);
-            const appts: Appointment[] = [];
-
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                appts.push({
-                    id: doc.id,
-                    patientName: data.patientName || "Paciente",
-                    patientEmail: data.patientEmail,
-                    service: data.service || data.treatmentType || "Consulta",
-                    date: data.date,
-                    time: data.time,
-                    duration: data.duration || 60,
-                    status: data.status || 'confirmed',
+            // 1. Leer de 'appointments' (agendados por el profesional)
+            try {
+                const q = query(
+                    collection(db, "appointments"),
+                    where("professionalId", "==", professionalId),
+                    where("date", ">=", startDate),
+                    where("date", "<=", endDate)
+                );
+                const snap = await getDocs(q);
+                snap.forEach((doc) => {
+                    const data = doc.data();
+                    all.push({
+                        id: doc.id,
+                        patientName: data.patientName || "Paciente",
+                        patientEmail: data.patientEmail || "",
+                        service: data.service || data.treatmentType || "Consulta",
+                        date: data.date,
+                        time: data.time,
+                        duration: data.duration || 60,
+                        status: data.status || 'confirmed',
+                    });
                 });
-            });
+            } catch (e) { console.warn("appointments:", e); }
 
-            setAppointments(appts);
+            // 2. Leer de 'bookings' (reservas hechas por usuarios)
+            try {
+                const q = query(
+                    collection(db, "bookings"),
+                    where("professionalId", "==", professionalId),
+                    where("date", ">=", startDate),
+                    where("date", "<=", endDate)
+                );
+                const snap = await getDocs(q);
+                snap.forEach((doc) => {
+                    const data = doc.data();
+                    all.push({
+                        id: doc.id,
+                        patientName: data.user?.name || data.patientName || "Paciente",
+                        patientEmail: data.user?.email || data.patientEmail || "",
+                        service: data.serviceName || data.service || "Consulta",
+                        date: data.date,
+                        time: data.time,
+                        duration: data.duration || 50,
+                        status: data.status || 'pending',
+                    });
+                });
+            } catch (e) { console.warn("bookings:", e); }
+
+            setAppointments(all);
+            setLoading(false);
         } catch (error) {
             console.error("Error fetching appointments:", error);
+            setLoading(false);
         }
     };
 
