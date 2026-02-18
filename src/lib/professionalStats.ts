@@ -3,7 +3,7 @@
  * Handles analytics, revenue reports, and patient management
  */
 
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from 'date-fns';
 
@@ -107,7 +107,7 @@ export async function getMonthlyReport(
         // Consultar tanto 'appointments' como 'bookings'
         // NOTA: No filtramos por fecha en Firestore para evitar requerir índices compuestos.
         // Filtramos por fecha en memoria.
-        const [apptSnap, bookSnap] = await Promise.all([
+        const [apptSnap, bookSnap, profSnap] = await Promise.all([
             getDocs(query(
                 collection(db, 'appointments'),
                 where('professionalId', '==', professionalId)
@@ -116,7 +116,14 @@ export async function getMonthlyReport(
                 collection(db, 'bookings'),
                 where('professionalId', '==', professionalId)
             )).catch(e => { console.warn('[Stats] bookings query error:', e); return { docs: [] } as any; }),
+            // Cargar el precio base del profesional como fallback
+            getDoc(doc(db, 'professionals', professionalId))
+                .catch(() => null),
         ]);
+
+        // Precio base del profesional (fallback para appointments sin precio)
+        const professionalBasePrice = profSnap?.exists?.() ? (Number(profSnap.data()?.price) || 0) : 0;
+        console.log(`[Stats] precio base profesional: $${professionalBasePrice}`);
 
         console.log(`[Stats] docs encontrados: appointments=${apptSnap.docs.length}, bookings=${bookSnap.docs.length}`);
 
@@ -144,7 +151,15 @@ export async function getMonthlyReport(
 
             if (completed) {
                 completedSessions++;
-                totalRevenue += Number(data.price || data.servicePrice || 0);
+                // Buscar precio en múltiples campos, con fallback al precio base del profesional
+                const sessionPrice = Number(
+                    data.price ||
+                    data.servicePrice ||
+                    data.amount ||
+                    data.totalAmount ||
+                    professionalBasePrice
+                );
+                totalRevenue += sessionPrice;
             }
 
             if (cancelled) {
@@ -164,7 +179,14 @@ export async function getMonthlyReport(
             const dayStats = dailyStatsMap.get(dateKey)!;
             dayStats.sessions++;
             if (completed) {
-                dayStats.revenue += Number(data.price || data.servicePrice || 0);
+                const sessionPrice = Number(
+                    data.price ||
+                    data.servicePrice ||
+                    data.amount ||
+                    data.totalAmount ||
+                    professionalBasePrice
+                );
+                dayStats.revenue += sessionPrice;
             }
         });
 

@@ -61,10 +61,13 @@ export default function CalendarPage() {
         patientName: "",
         patientEmail: "",
         service: "",
+        serviceId: "",
+        price: 0,
         duration: 60,
         notes: ""
     });
     const [creating, setCreating] = useState(false);
+    const [professionalServices, setProfessionalServices] = useState<Array<{ id: string; name: string; price: number; duration: number }>>([]);
 
     // Modal de detalle/edición de turno
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -152,6 +155,25 @@ export default function CalendarPage() {
 
         loadAvailability();
         fetchAppointments(user.uid);
+
+        // Cargar servicios del profesional desde el documento principal
+        const loadServices = async () => {
+            try {
+                const profDoc = await getDoc(doc(db, 'professionals', user.uid));
+                if (profDoc.exists()) {
+                    const data = profDoc.data();
+                    // Los servicios están en el campo services[] del documento
+                    const svcs = data.services || [];
+                    setProfessionalServices(svcs.map((s: any) => ({
+                        id: s.id || s.name,
+                        name: s.name,
+                        price: Number(s.price) || 0,
+                        duration: Number(s.duration) || 60,
+                    })));
+                }
+            } catch (e) { console.warn('services:', e); }
+        };
+        loadServices();
 
         // Recargar cuando el usuario vuelve a esta pestaña
         const handleVisibility = () => {
@@ -373,6 +395,8 @@ export default function CalendarPage() {
                 patientName: newAppointment.patientName,
                 patientEmail: newAppointment.patientEmail || "",
                 service: newAppointment.service,
+                serviceId: newAppointment.serviceId || null,
+                price: newAppointment.price || 0,
                 date: selectedSlot.date,
                 time: selectedSlot.time,
                 duration: newAppointment.duration,
@@ -394,6 +418,8 @@ export default function CalendarPage() {
                 patientName: "",
                 patientEmail: "",
                 service: "",
+                serviceId: "",
+                price: 0,
                 duration: 60,
                 notes: ""
             });
@@ -632,7 +658,7 @@ export default function CalendarPage() {
                                     <div
                                         key={idx}
                                         className={`p-3 text-center border-l border-neutral-200 ${isToday(day) ? 'bg-primary/10' :
-                                                isUnavailable ? 'bg-neutral-100' : ''
+                                            isUnavailable ? 'bg-neutral-100' : ''
                                             }`}
                                     >
                                         <div className={`text-xs font-semibold uppercase ${isUnavailable ? 'text-neutral-400' : 'text-text-muted'}`}>
@@ -1099,13 +1125,39 @@ export default function CalendarPage() {
                                 <label className="block text-sm font-medium text-text-secondary mb-1">
                                     Servicio *
                                 </label>
-                                <input
-                                    type="text"
-                                    value={newAppointment.service}
-                                    onChange={(e) => setNewAppointment({ ...newAppointment, service: e.target.value })}
-                                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    placeholder="Consulta general, Masaje, etc."
-                                />
+                                {professionalServices.length > 0 ? (
+                                    <select
+                                        value={newAppointment.serviceId}
+                                        onChange={(e) => {
+                                            const svc = professionalServices.find(s => s.id === e.target.value);
+                                            if (svc) {
+                                                setNewAppointment({
+                                                    ...newAppointment,
+                                                    serviceId: svc.id,
+                                                    service: svc.name,
+                                                    price: svc.price,
+                                                    duration: svc.duration,
+                                                });
+                                            }
+                                        }}
+                                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                    >
+                                        <option value="">Seleccioná un servicio...</option>
+                                        {professionalServices.map(svc => (
+                                            <option key={svc.id} value={svc.id}>
+                                                {svc.name} — ${svc.price.toLocaleString('es-AR')} ({svc.duration} min)
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={newAppointment.service}
+                                        onChange={(e) => setNewAppointment({ ...newAppointment, service: e.target.value })}
+                                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                        placeholder="Consulta general, Masaje, etc."
+                                    />
+                                )}
                             </div>
 
                             <div>
