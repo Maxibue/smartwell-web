@@ -123,7 +123,12 @@ export default function ReservarPage() {
 
         setBooking(true);
         try {
-            const dateStr = selectedDate.toISOString().split("T")[0];
+            // Fecha en hora de Buenos Aires (ART, UTC-3)
+            const dateStr = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "America/Argentina/Buenos_Aires",
+                year: "numeric", month: "2-digit", day: "2-digit",
+            }).format(selectedDate);
+
 
             // Generate Jitsi meeting room
             const tempAppointmentId = `temp-${Date.now()}`;
