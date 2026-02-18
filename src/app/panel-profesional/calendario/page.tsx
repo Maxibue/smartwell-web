@@ -14,13 +14,15 @@ const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", 
 
 interface Appointment {
     id: string;
+    source: 'appointment' | 'booking';
     patientName: string;
     patientEmail?: string;
     service: string;
     date: string;
     time: string;
     duration: number;
-    status: 'confirmed' | 'pending' | 'cancelled';
+    status: 'confirmed' | 'pending' | 'cancelled' | 'completed';
+    notes?: string;
 }
 
 export default function CalendarPage() {
@@ -43,6 +45,15 @@ export default function CalendarPage() {
         notes: ""
     });
     const [creating, setCreating] = useState(false);
+
+    // Modal de detalle/edición de turno
+    const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [updatingStatus, setUpdatingStatus] = useState(false);
+    const [isRescheduling, setIsRescheduling] = useState(false);
+    const [rescheduleDate, setRescheduleDate] = useState("");
+    const [rescheduleTime, setRescheduleTime] = useState("");
+    const [rescheduling, setRescheduling] = useState(false);
 
     function getMonday(d: Date) {
         const date = new Date(d);
@@ -145,6 +156,7 @@ export default function CalendarPage() {
                     const data = doc.data();
                     all.push({
                         id: doc.id,
+                        source: 'appointment',
                         patientName: data.patientName || "Paciente",
                         patientEmail: data.patientEmail || "",
                         service: data.service || data.treatmentType || "Consulta",
@@ -152,6 +164,7 @@ export default function CalendarPage() {
                         time: data.time,
                         duration: data.duration || 60,
                         status: data.status || 'confirmed',
+                        notes: data.notes || "",
                     });
                 });
             } catch (e) { console.warn("appointments:", e); }
@@ -169,6 +182,7 @@ export default function CalendarPage() {
                     const data = doc.data();
                     all.push({
                         id: doc.id,
+                        source: 'booking',
                         patientName: data.user?.name || data.patientName || "Paciente",
                         patientEmail: data.user?.email || data.patientEmail || "",
                         service: data.serviceName || data.service || "Consulta",
@@ -176,6 +190,7 @@ export default function CalendarPage() {
                         time: data.time,
                         duration: data.duration || 50,
                         status: data.status || 'pending',
+                        notes: data.notes || "",
                     });
                 });
             } catch (e) { console.warn("bookings:", e); }
@@ -235,14 +250,64 @@ export default function CalendarPage() {
         const dateStr = formatDate(date);
         const timeStr = `${hour.toString().padStart(2, '0')}:00`;
 
-        // Check if slot is already booked
         const existingAppt = appointments.find(apt =>
-            apt.date === dateStr && apt.time === timeStr
+            apt.date === dateStr && apt.time.startsWith(timeStr.substring(0, 2))
         );
 
-        if (!existingAppt) {
+        if (existingAppt) {
+            // Abrir modal de detalle
+            setSelectedAppointment(existingAppt);
+            setRescheduleDate(existingAppt.date);
+            setRescheduleTime(existingAppt.time);
+            setIsRescheduling(false);
+            setShowDetailModal(true);
+        } else {
             setSelectedSlot({ date: dateStr, time: timeStr });
             setShowCreateModal(true);
+        }
+    };
+
+    const handleUpdateStatus = async (newStatus: string) => {
+        if (!selectedAppointment || !user) return;
+        setUpdatingStatus(true);
+        try {
+            const col = selectedAppointment.source === 'booking' ? 'bookings' : 'appointments';
+            const { doc, updateDoc } = await import('firebase/firestore');
+            await updateDoc(doc(db, col, selectedAppointment.id), { status: newStatus });
+            // Actualizar localmente
+            setAppointments(prev => prev.map(a =>
+                a.id === selectedAppointment.id ? { ...a, status: newStatus as any } : a
+            ));
+            setSelectedAppointment(prev => prev ? { ...prev, status: newStatus as any } : null);
+            await fetchAppointments(user.uid);
+        } catch (e) {
+            console.error('Error updating status:', e);
+            alert('Error al actualizar el estado');
+        } finally {
+            setUpdatingStatus(false);
+        }
+    };
+
+    const handleReschedule = async () => {
+        if (!selectedAppointment || !user || !rescheduleDate || !rescheduleTime) return;
+        setRescheduling(true);
+        try {
+            const col = selectedAppointment.source === 'booking' ? 'bookings' : 'appointments';
+            const { doc, updateDoc } = await import('firebase/firestore');
+            await updateDoc(doc(db, col, selectedAppointment.id), {
+                date: rescheduleDate,
+                time: rescheduleTime,
+                rescheduledAt: new Date().toISOString(),
+                rescheduledBy: 'professional',
+            });
+            setIsRescheduling(false);
+            setShowDetailModal(false);
+            await fetchAppointments(user.uid);
+        } catch (e) {
+            console.error('Error rescheduling:', e);
+            alert('Error al reagendar el turno');
+        } finally {
+            setRescheduling(false);
         }
     };
 
@@ -591,7 +656,15 @@ export default function CalendarPage() {
                                             {dayAppts.slice(0, 3).map((apt, aptIdx) => (
                                                 <div
                                                     key={aptIdx}
-                                                    className={`text-xs p-1 rounded border-l-2 ${getStatusColor(apt.status)}`}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedAppointment(apt);
+                                                        setRescheduleDate(apt.date);
+                                                        setRescheduleTime(apt.time);
+                                                        setIsRescheduling(false);
+                                                        setShowDetailModal(true);
+                                                    }}
+                                                    className={`text-xs p-1 rounded border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor(apt.status)}`}
                                                 >
                                                     <div className="font-medium truncate">{apt.time} - {apt.patientName}</div>
                                                 </div>
@@ -634,6 +707,174 @@ export default function CalendarPage() {
                     </div>
                 )}
             </div>
+
+            {/* ── Modal Detalle / Edición de Turno ── */}
+            {showDetailModal && selectedAppointment && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+                        {/* Header con color según estado */}
+                        <div className={`p-5 ${selectedAppointment.status === 'confirmed' ? 'bg-primary/10 border-b border-primary/20' :
+                            selectedAppointment.status === 'pending' ? 'bg-amber-50 border-b border-amber-200' :
+                                selectedAppointment.status === 'completed' ? 'bg-blue-50 border-b border-blue-200' :
+                                    'bg-neutral-100 border-b border-neutral-200'
+                            }`}>
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${selectedAppointment.status === 'confirmed' ? 'bg-primary text-white' :
+                                            selectedAppointment.status === 'pending' ? 'bg-amber-500 text-white' :
+                                                selectedAppointment.status === 'completed' ? 'bg-blue-500 text-white' :
+                                                    'bg-neutral-400 text-white'
+                                            }`}>
+                                            {selectedAppointment.status === 'confirmed' ? 'Confirmado' :
+                                                selectedAppointment.status === 'pending' ? 'Pendiente' :
+                                                    selectedAppointment.status === 'completed' ? 'Completado' : 'Cancelado'}
+                                        </span>
+                                        <span className="text-xs text-text-muted capitalize">
+                                            {selectedAppointment.source === 'booking' ? '· Reserva de usuario' : '· Agendado por vos'}
+                                        </span>
+                                    </div>
+                                    <h3 className="text-xl font-bold text-secondary">{selectedAppointment.patientName}</h3>
+                                    <p className="text-sm text-text-secondary">{selectedAppointment.service}</p>
+                                </div>
+                                <button
+                                    onClick={() => { setShowDetailModal(false); setIsRescheduling(false); }}
+                                    className="text-text-muted hover:text-secondary p-1"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            {/* Info del turno */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-neutral-50 rounded-lg p-3">
+                                    <p className="text-xs text-text-muted mb-1">Fecha</p>
+                                    <p className="font-semibold text-secondary text-sm">{selectedAppointment.date}</p>
+                                </div>
+                                <div className="bg-neutral-50 rounded-lg p-3">
+                                    <p className="text-xs text-text-muted mb-1">Hora</p>
+                                    <p className="font-semibold text-secondary text-sm">{selectedAppointment.time}hs · {selectedAppointment.duration}min</p>
+                                </div>
+                                {selectedAppointment.patientEmail && (
+                                    <div className="bg-neutral-50 rounded-lg p-3 col-span-2">
+                                        <p className="text-xs text-text-muted mb-1">Email del paciente</p>
+                                        <p className="font-semibold text-secondary text-sm">{selectedAppointment.patientEmail}</p>
+                                    </div>
+                                )}
+                                {selectedAppointment.notes && (
+                                    <div className="bg-neutral-50 rounded-lg p-3 col-span-2">
+                                        <p className="text-xs text-text-muted mb-1">Notas</p>
+                                        <p className="text-secondary text-sm">{selectedAppointment.notes}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Cambiar Estado */}
+                            {!isRescheduling && (
+                                <div>
+                                    <p className="text-xs font-semibold text-text-muted uppercase mb-2">Cambiar Estado</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {selectedAppointment.status !== 'confirmed' && (
+                                            <button
+                                                onClick={() => handleUpdateStatus('confirmed')}
+                                                disabled={updatingStatus}
+                                                className="flex items-center justify-center gap-2 px-3 py-2 bg-primary/10 text-primary border border-primary/30 rounded-lg text-sm font-semibold hover:bg-primary/20 transition-colors disabled:opacity-50"
+                                            >
+                                                ✓ Confirmar
+                                            </button>
+                                        )}
+                                        {selectedAppointment.status !== 'completed' && (
+                                            <button
+                                                onClick={() => handleUpdateStatus('completed')}
+                                                disabled={updatingStatus}
+                                                className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-semibold hover:bg-blue-100 transition-colors disabled:opacity-50"
+                                            >
+                                                ✓ Completar
+                                            </button>
+                                        )}
+                                        {selectedAppointment.status !== 'pending' && (
+                                            <button
+                                                onClick={() => handleUpdateStatus('pending')}
+                                                disabled={updatingStatus}
+                                                className="flex items-center justify-center gap-2 px-3 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-sm font-semibold hover:bg-amber-100 transition-colors disabled:opacity-50"
+                                            >
+                                                ⏳ Pendiente
+                                            </button>
+                                        )}
+                                        {selectedAppointment.status !== 'cancelled' && (
+                                            <button
+                                                onClick={() => handleUpdateStatus('cancelled')}
+                                                disabled={updatingStatus}
+                                                className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-semibold hover:bg-red-100 transition-colors disabled:opacity-50"
+                                            >
+                                                ✕ Cancelar
+                                            </button>
+                                        )}
+                                    </div>
+                                    {updatingStatus && (
+                                        <p className="text-xs text-text-muted text-center mt-2">Actualizando...</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Reagendar */}
+                            {!isRescheduling ? (
+                                <button
+                                    onClick={() => setIsRescheduling(true)}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-primary/40 text-primary rounded-xl text-sm font-semibold hover:bg-primary/5 transition-colors"
+                                >
+                                    <Clock className="h-4 w-4" />
+                                    Reagendar turno
+                                </button>
+                            ) : (
+                                <div className="border border-primary/30 rounded-xl p-4 bg-primary/5">
+                                    <p className="text-sm font-bold text-secondary mb-3 flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-primary" />
+                                        Nueva fecha y hora
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3 mb-3">
+                                        <div>
+                                            <label className="text-xs text-text-muted mb-1 block">Fecha</label>
+                                            <input
+                                                type="date"
+                                                value={rescheduleDate}
+                                                onChange={(e) => setRescheduleDate(e.target.value)}
+                                                className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-text-muted mb-1 block">Hora</label>
+                                            <input
+                                                type="time"
+                                                value={rescheduleTime}
+                                                onChange={(e) => setRescheduleTime(e.target.value)}
+                                                className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setIsRescheduling(false)}
+                                            className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm text-text-secondary hover:bg-neutral-50 transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={handleReschedule}
+                                            disabled={rescheduling || !rescheduleDate || !rescheduleTime}
+                                            className="flex-1 px-3 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                        >
+                                            {rescheduling ? 'Guardando...' : 'Confirmar reagenda'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Create Appointment Modal */}
             {showCreateModal && selectedSlot && (
