@@ -47,6 +47,7 @@ export default function ProfessionalPatientsPage() {
     const [editingNotes, setEditingNotes] = useState(false);
     const [notes, setNotes] = useState('');
     const [savingNotes, setSavingNotes] = useState(false);
+    const [sessionFilter, setSessionFilter] = useState<'all' | 'confirmed' | 'pending' | 'spent'>('all');
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -196,6 +197,7 @@ export default function ProfessionalPatientsPage() {
         setSelectedPatient(patient);
         setNotes(patient.notes || '');
         setEditingNotes(false);
+        setSessionFilter('all'); // Reset filtro al cambiar de paciente
     };
 
     const handleSaveNotes = async () => {
@@ -403,37 +405,77 @@ export default function ProfessionalPatientsPage() {
                                 </div>
 
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="bg-blue-50 p-4 rounded-lg">
+                                    {/* Total Sesiones */}
+                                    <button
+                                        onClick={() => setSessionFilter(sessionFilter === 'all' ? 'all' : 'all')}
+                                        className={`p-4 rounded-lg text-left transition-all ${sessionFilter === 'all'
+                                                ? 'bg-blue-100 ring-2 ring-blue-400 shadow-md'
+                                                : 'bg-blue-50 hover:bg-blue-100 hover:shadow-sm'
+                                            }`}
+                                    >
                                         <div className="flex items-center gap-2 text-blue-600 mb-1">
                                             <Calendar className="h-4 w-4" />
                                             <p className="text-xs font-medium">Total Sesiones</p>
                                         </div>
                                         <p className="text-2xl font-bold text-blue-900">{selectedPatient.totalSessions}</p>
-                                    </div>
+                                        {sessionFilter === 'all' && (
+                                            <p className="text-xs text-blue-500 mt-1 font-medium">▶ Mostrando todas</p>
+                                        )}
+                                    </button>
 
-                                    <div className="bg-green-50 p-4 rounded-lg">
+                                    {/* Confirmadas */}
+                                    <button
+                                        onClick={() => setSessionFilter(sessionFilter === 'confirmed' ? 'all' : 'confirmed')}
+                                        className={`p-4 rounded-lg text-left transition-all ${sessionFilter === 'confirmed'
+                                                ? 'bg-green-100 ring-2 ring-green-400 shadow-md'
+                                                : 'bg-green-50 hover:bg-green-100 hover:shadow-sm'
+                                            }`}
+                                    >
                                         <div className="flex items-center gap-2 text-green-600 mb-1">
                                             <Calendar className="h-4 w-4" />
                                             <p className="text-xs font-medium">Confirmadas</p>
                                         </div>
                                         <p className="text-2xl font-bold text-green-900">{selectedPatient.completedSessions}</p>
-                                    </div>
+                                        {sessionFilter === 'confirmed' && (
+                                            <p className="text-xs text-green-500 mt-1 font-medium">▶ Filtrando</p>
+                                        )}
+                                    </button>
 
-                                    <div className="bg-amber-50 p-4 rounded-lg">
+                                    {/* Pendientes */}
+                                    <button
+                                        onClick={() => setSessionFilter(sessionFilter === 'pending' ? 'all' : 'pending')}
+                                        className={`p-4 rounded-lg text-left transition-all ${sessionFilter === 'pending'
+                                                ? 'bg-amber-100 ring-2 ring-amber-400 shadow-md'
+                                                : 'bg-amber-50 hover:bg-amber-100 hover:shadow-sm'
+                                            }`}
+                                    >
                                         <div className="flex items-center gap-2 text-amber-600 mb-1">
                                             <Clock className="h-4 w-4" />
                                             <p className="text-xs font-medium">Pendientes</p>
                                         </div>
                                         <p className="text-2xl font-bold text-amber-900">{selectedPatient.pendingSessions}</p>
-                                    </div>
+                                        {sessionFilter === 'pending' && (
+                                            <p className="text-xs text-amber-500 mt-1 font-medium">▶ Filtrando</p>
+                                        )}
+                                    </button>
 
-                                    <div className="bg-purple-50 p-4 rounded-lg">
+                                    {/* Total Gastado */}
+                                    <button
+                                        onClick={() => setSessionFilter(sessionFilter === 'spent' ? 'all' : 'spent')}
+                                        className={`p-4 rounded-lg text-left transition-all ${sessionFilter === 'spent'
+                                                ? 'bg-purple-100 ring-2 ring-purple-400 shadow-md'
+                                                : 'bg-purple-50 hover:bg-purple-100 hover:shadow-sm'
+                                            }`}
+                                    >
                                         <div className="flex items-center gap-2 text-purple-600 mb-1">
                                             <DollarSign className="h-4 w-4" />
                                             <p className="text-xs font-medium">Total Gastado</p>
                                         </div>
                                         <p className="text-2xl font-bold text-purple-900">${selectedPatient.totalSpent.toLocaleString()}</p>
-                                    </div>
+                                        {sessionFilter === 'spent' && (
+                                            <p className="text-xs text-purple-500 mt-1 font-medium">▶ Con precio</p>
+                                        )}
+                                    </button>
                                 </div>
 
                                 {/* First/Last Session Info */}
@@ -555,61 +597,92 @@ export default function ProfessionalPatientsPage() {
 
                             {/* Session History */}
                             <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-6">
-                                <h3 className="font-bold text-secondary mb-4 flex items-center gap-2">
-                                    <Calendar className="h-5 w-5" />
-                                    Historial de Sesiones ({selectedPatient.sessions.length})
-                                </h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-secondary flex items-center gap-2">
+                                        <Calendar className="h-5 w-5" />
+                                        Historial de Sesiones
+                                        <span className="text-sm font-normal text-text-muted">
+                                            ({(() => {
+                                                if (sessionFilter === 'all') return selectedPatient.sessions.length;
+                                                if (sessionFilter === 'confirmed') return selectedPatient.sessions.filter(s => s.status === 'confirmed' || s.status === 'completed').length;
+                                                if (sessionFilter === 'pending') return selectedPatient.sessions.filter(s => s.status === 'pending').length;
+                                                if (sessionFilter === 'spent') return selectedPatient.sessions.filter(s => s.price > 0).length;
+                                                return selectedPatient.sessions.length;
+                                            })()})
+                                        </span>
+                                    </h3>
+                                    {sessionFilter !== 'all' && (
+                                        <button
+                                            onClick={() => setSessionFilter('all')}
+                                            className="text-xs text-text-muted hover:text-secondary flex items-center gap-1 px-2 py-1 rounded hover:bg-neutral-100 transition-colors"
+                                        >
+                                            <X className="h-3 w-3" /> Quitar filtro
+                                        </button>
+                                    )}
+                                </div>
 
-                                {selectedPatient.sessions.length === 0 ? (
-                                    <div className="text-center py-8 text-text-muted">
-                                        <Calendar className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                                        <p>No hay sesiones registradas</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {selectedPatient.sessions.map((session) => (
-                                            <div
-                                                key={session.id}
-                                                className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
-                                            >
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="font-semibold text-secondary">
-                                                            {formatDateSafe(session.date)}
-                                                        </p>
-                                                        <span className="text-xs text-text-muted capitalize">
-                                                            {formatDayName(session.date)}
-                                                        </span>
+                                {(() => {
+                                    const filtered = selectedPatient.sessions.filter(s => {
+                                        if (sessionFilter === 'confirmed') return s.status === 'confirmed' || s.status === 'completed';
+                                        if (sessionFilter === 'pending') return s.status === 'pending';
+                                        if (sessionFilter === 'spent') return s.price > 0;
+                                        return true;
+                                    });
+
+                                    if (filtered.length === 0) return (
+                                        <div className="text-center py-8 text-text-muted">
+                                            <Calendar className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                            <p>No hay sesiones con este filtro</p>
+                                            <button onClick={() => setSessionFilter('all')} className="text-primary text-sm mt-2 underline">Ver todas</button>
+                                        </div>
+                                    );
+
+                                    return (
+                                        <div className="space-y-3">
+                                            {filtered.map((session) => (
+                                                <div
+                                                    key={session.id}
+                                                    className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
+                                                >
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-semibold text-secondary">
+                                                                {formatDateSafe(session.date)}
+                                                            </p>
+                                                            <span className="text-xs text-text-muted capitalize">
+                                                                {formatDayName(session.date)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 mt-1 text-sm text-text-secondary">
+                                                            <span className="flex items-center gap-1">
+                                                                <Clock className="h-3 w-3" />
+                                                                {session.time} hs
+                                                            </span>
+                                                            <span>•</span>
+                                                            <span>{session.service}</span>
+                                                            <span>•</span>
+                                                            <span>{session.duration} min</span>
+                                                        </div>
+                                                        {session.notes && (
+                                                            <p className="text-xs text-text-muted mt-1 italic">"{session.notes}"</p>
+                                                        )}
                                                     </div>
-                                                    <div className="flex items-center gap-3 mt-1 text-sm text-text-secondary">
-                                                        <span className="flex items-center gap-1">
-                                                            <Clock className="h-3 w-3" />
-                                                            {session.time} hs
+                                                    <div className="text-right ml-4">
+                                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(session.status)}`}>
+                                                            {getStatusLabel(session.status)}
                                                         </span>
-                                                        <span>•</span>
-                                                        <span>{session.service}</span>
-                                                        <span>•</span>
-                                                        <span>{session.duration} min</span>
+                                                        {session.price > 0 && (
+                                                            <p className="text-sm font-bold text-secondary mt-1">${session.price.toLocaleString()}</p>
+                                                        )}
+                                                        {session.createdBy === 'professional' && (
+                                                            <p className="text-xs text-text-muted mt-0.5">Turno manual</p>
+                                                        )}
                                                     </div>
-                                                    {session.notes && (
-                                                        <p className="text-xs text-text-muted mt-1 italic">"{session.notes}"</p>
-                                                    )}
                                                 </div>
-                                                <div className="text-right ml-4">
-                                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(session.status)}`}>
-                                                        {getStatusLabel(session.status)}
-                                                    </span>
-                                                    {session.price > 0 && (
-                                                        <p className="text-sm font-bold text-secondary mt-1">${session.price}</p>
-                                                    )}
-                                                    {session.createdBy === 'professional' && (
-                                                        <p className="text-xs text-text-muted mt-0.5">Turno manual</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </>
                     )}
