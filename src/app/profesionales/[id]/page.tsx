@@ -99,16 +99,26 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
             const profDoc = await getDoc(doc(db, "professionals", params.id));
             if (profDoc.exists()) {
                 const data = profDoc.data();
+
+                // Soporta tanto el formato nuevo (firstName/lastName) como el formato real de Firestore (name)
+                let firstName = data.firstName || "";
+                let lastName = data.lastName || "";
+                if (!firstName && data.name) {
+                    const parts = (data.name as string).trim().split(" ");
+                    firstName = parts[0] || "";
+                    lastName = parts.slice(1).join(" ") || "";
+                }
+
                 setProfessional({
-                    firstName: data.firstName || "",
-                    lastName: data.lastName || "",
+                    firstName,
+                    lastName,
                     title: data.title || "",
-                    specialty: data.specialty || "",
+                    specialty: data.specialty || data.specialization || "",
                     category: data.category || "",
-                    bio: data.bio || "",
+                    bio: data.bio || data.description || "",
                     price: data.price || 0,
-                    sessionDuration: data.sessionDuration || 50,
-                    profileImage: data.profileImage,
+                    sessionDuration: data.sessionDuration || data.duration || 50,
+                    profileImage: data.profileImage || data.image,
                     rating: data.rating || 5,
                     reviewCount: data.reviewCount || 0,
                     status: data.status || "pending",
