@@ -5,10 +5,7 @@ import { Input, Label } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Clock, DollarSign, Plus, Trash2, Edit2, Loader2, Check, X, Briefcase } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
-import {
-    collection, addDoc, getDocs, deleteDoc,
-    doc, query, updateDoc
-} from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { sanitizeText, sanitizeHTML, detectXSS } from "@/lib/sanitize";
 import { PROFESSIONAL_CATEGORIES } from "@/lib/categories";
@@ -57,16 +54,38 @@ export default function ServicesPage() {
         return () => unsubscribe();
     }, []);
 
+    // Lee el array services[] del documento principal professionals/{uid}
     const fetchServices = async (uid: string) => {
         try {
-            const q = query(collection(db, "professionals", uid, "services"));
-            const snap = await getDocs(q);
-            setServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Service)));
+            const profDoc = await getDoc(doc(db, "professionals", uid));
+            if (profDoc.exists()) {
+                const data = profDoc.data();
+                const raw: Service[] = (data.services || []).map((s: Omit<Service, 'id'> & { id?: string }) => ({
+                    id: s.id || crypto.randomUUID(),
+                    name: s.name || "",
+                    description: s.description || "",
+                    duration: Number(s.duration) || 50,
+                    price: Number(s.price) || 0,
+                }));
+                setServices(raw);
+            }
         } catch (e) {
-            console.error(e);
+            console.error("Error fetching services:", e);
         } finally {
             setLoading(false);
         }
+    };
+
+    // Persiste el array completo en Firestore y sincroniza specialty/price/duration
+    const persistServices = async (uid: string, updated: Service[]) => {
+        const first = updated[0];
+        await updateDoc(doc(db, "professionals", uid), {
+            services: updated,
+            // Compatibilidad con el resto de la app
+            specialty: first?.name || "",
+            price: first?.price || 0,
+            duration: first?.duration || 50,
+        });
     };
 
     // ── Crear ──────────────────────────────────────────────────────────────────
@@ -79,18 +98,21 @@ export default function ServicesPage() {
         }
         setSubmitting(true);
         try {
-            const data = {
+            const newService: Service = {
+                id: crypto.randomUUID(),
                 name: sanitizeText(newForm.name),
                 description: sanitizeHTML(newForm.description),
                 duration: parseInt(newForm.duration) || 50,
                 price: parseFloat(newForm.price) || 0,
             };
-            const ref = await addDoc(collection(db, "professionals", user.uid, "services"), data);
-            setServices(prev => [...prev, { id: ref.id, ...data }]);
+            const updated = [...services, newService];
+            await persistServices(user.uid, updated);
+            setServices(updated);
             setNewForm(EMPTY_FORM);
             setShowNew(false);
         } catch (e) {
-            console.error(e);
+            console.error("Error creating service:", e);
+            alert("❌ Error al crear el servicio");
         } finally {
             setSubmitting(false);
         }
@@ -120,17 +142,23 @@ export default function ServicesPage() {
         }
         setSavingId(id);
         try {
-            const data = {
-                name: sanitizeText(editForm.name),
-                description: sanitizeHTML(editForm.description),
-                duration: parseInt(editForm.duration) || 50,
-                price: parseFloat(editForm.price) || 0,
-            };
-            await updateDoc(doc(db, "professionals", user.uid, "services", id), data);
-            setServices(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+            const updated = services.map(s =>
+                s.id === id
+                    ? {
+                        ...s,
+                        name: sanitizeText(editForm.name),
+                        description: sanitizeHTML(editForm.description),
+                        duration: parseInt(editForm.duration) || 50,
+                        price: parseFloat(editForm.price) || 0,
+                    }
+                    : s
+            );
+            await persistServices(user.uid, updated);
+            setServices(updated);
             setEditingId(null);
         } catch (e) {
-            console.error(e);
+            console.error("Error saving edit:", e);
+            alert("❌ Error al guardar los cambios");
         } finally {
             setSavingId(null);
         }
@@ -141,10 +169,12 @@ export default function ServicesPage() {
         if (!user) return;
         if (!confirm("¿Eliminar este servicio?")) return;
         try {
-            await deleteDoc(doc(db, "professionals", user.uid, "services", id));
-            setServices(prev => prev.filter(s => s.id !== id));
+            const updated = services.filter(s => s.id !== id);
+            await persistServices(user.uid, updated);
+            setServices(updated);
         } catch (e) {
-            console.error(e);
+            console.error("Error deleting service:", e);
+            alert("❌ Error al eliminar el servicio");
         }
     };
 
