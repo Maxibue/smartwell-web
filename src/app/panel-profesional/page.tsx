@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
     Calendar, Users, DollarSign, Clock, Loader2, Video,
-    Edit2, Check, X, TrendingUp, CheckCircle, AlertCircle
+    Edit2, Check, X, TrendingUp, CheckCircle, AlertCircle, ChevronDown
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -89,6 +89,7 @@ export default function ProfessionalDashboard() {
     const [isEditingLink, setIsEditingLink] = useState(false);
     const [savingLink, setSavingLink] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [openStatusId, setOpenStatusId] = useState<string | null>(null);
 
     // ── Carga de datos ──────────────────────────────────────────────────────
     const fetchData = async (uid: string) => {
@@ -358,54 +359,131 @@ export default function ProfessionalDashboard() {
 
             {/* Main Grid */}
             <div className="grid lg:grid-cols-3 gap-6">
-                {/* Próximas sesiones confirmadas */}
+                {/* Próximas sesiones */}
                 <div className="lg:col-span-2">
                     <div className="bg-white rounded-xl shadow-sm border border-neutral-100 overflow-hidden">
                         <div className="p-5 border-b border-neutral-100 flex justify-between items-center">
                             <h3 className="font-bold text-secondary flex items-center gap-2">
                                 <CheckCircle className="h-4 w-4 text-green-500" />
-                                Próximas Sesiones Confirmadas
+                                Próximas Sesiones
+                                <span className="text-xs font-normal text-text-muted ml-1">
+                                    ({upcomingSessions.length} total)
+                                </span>
                             </h3>
                             <Link href="/panel-profesional/calendario">
                                 <Button variant="link" size="sm" className="text-primary">Ver calendario</Button>
                             </Link>
                         </div>
-                        <div className="divide-y divide-neutral-100">
-                            {confirmedSessions.length === 0 ? (
+
+                        {/* Tabla */}
+                        <div className="overflow-x-auto">
+                            {upcomingSessions.length === 0 ? (
                                 <div className="p-8 text-center text-text-muted">
                                     <Calendar className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                                    <p>No tenés sesiones confirmadas próximamente.</p>
+                                    <p>No tenés sesiones próximas.</p>
                                 </div>
                             ) : (
-                                confirmedSessions.slice(0, 8).map((s) => (
-                                    <div key={s.id} className="p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm uppercase flex-shrink-0">
-                                                {(s.patientName || "?").substring(0, 2)}
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-secondary text-sm">{s.patientName}</p>
-                                                <p className="text-xs text-text-muted">
-                                                    {s.service}
-                                                    {s.date && ` · ${formatDateShort(s.date)}`}
-                                                    {s.time && ` ${s.time}hs`}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                            {s.price > 0 && (
-                                                <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-1 rounded">
-                                                    {formatARS(s.price)}
-                                                </span>
-                                            )}
-                                            <Link href={getSessionLink(s.id)} target="_blank" rel="noopener noreferrer">
-                                                <Button size="sm" variant="outline" className="h-7 text-xs border-primary text-primary hover:bg-primary/10">
-                                                    <Video className="h-3 w-3 mr-1" /> Video
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    </div>
-                                ))
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-neutral-50 text-xs text-text-muted uppercase tracking-wide">
+                                            <th className="text-left px-4 py-3 font-semibold">Paciente</th>
+                                            <th className="text-left px-4 py-3 font-semibold hidden md:table-cell">Servicio</th>
+                                            <th className="text-left px-4 py-3 font-semibold">Fecha</th>
+                                            <th className="text-right px-4 py-3 font-semibold hidden sm:table-cell">Precio</th>
+                                            <th className="text-center px-4 py-3 font-semibold">Estado</th>
+                                            <th className="text-center px-4 py-3 font-semibold">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-neutral-100">
+                                        {upcomingSessions.slice(0, 10).map((s) => {
+                                            const statusConfig: Record<string, { label: string; bg: string; text: string; dot: string }> = {
+                                                confirmed: { label: 'Confirmado', bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' },
+                                                pending: { label: 'Pendiente', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+                                                cancelled: { label: 'Cancelado', bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-400' },
+                                                completed: { label: 'Completado', bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
+                                            };
+                                            const cfg = statusConfig[s.status] || statusConfig['pending'];
+                                            const isOpen = openStatusId === s.id;
+
+                                            return (
+                                                <tr key={s.id} className="hover:bg-neutral-50 transition-colors">
+                                                    {/* Paciente */}
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs uppercase flex-shrink-0">
+                                                                {(s.patientName || '?').substring(0, 2)}
+                                                            </div>
+                                                            <span className="font-semibold text-secondary truncate max-w-[120px]">{s.patientName}</span>
+                                                        </div>
+                                                    </td>
+                                                    {/* Servicio */}
+                                                    <td className="px-4 py-3 text-text-muted hidden md:table-cell">
+                                                        <span className="truncate max-w-[140px] block">{s.service}</span>
+                                                    </td>
+                                                    {/* Fecha */}
+                                                    <td className="px-4 py-3 text-text-secondary whitespace-nowrap">
+                                                        {s.date ? formatDateShort(s.date) : '-'}
+                                                        {s.time && <span className="text-xs text-text-muted ml-1">{s.time}hs</span>}
+                                                    </td>
+                                                    {/* Precio */}
+                                                    <td className="px-4 py-3 text-right hidden sm:table-cell">
+                                                        {s.price > 0 && (
+                                                            <span className="font-semibold text-green-700">{formatARS(s.price)}</span>
+                                                        )}
+                                                    </td>
+                                                    {/* Estado - dropdown */}
+                                                    <td className="px-4 py-3 text-center">
+                                                        <div className="relative inline-block">
+                                                            <button
+                                                                onClick={() => setOpenStatusId(isOpen ? null : s.id)}
+                                                                disabled={processingId === s.id}
+                                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${cfg.bg
+                                                                    } ${cfg.text} border-transparent hover:border-current`}
+                                                            >
+                                                                {processingId === s.id
+                                                                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                                    : <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />}
+                                                                {cfg.label}
+                                                                <ChevronDown className="h-3 w-3 opacity-60" />
+                                                            </button>
+
+                                                            {isOpen && (
+                                                                <div
+                                                                    className="absolute z-20 top-full mt-1 right-0 bg-white border border-neutral-200 rounded-xl shadow-lg py-1 min-w-[150px]"
+                                                                    onMouseLeave={() => setOpenStatusId(null)}
+                                                                >
+                                                                    {Object.entries(statusConfig).map(([key, val]) => (
+                                                                        <button
+                                                                            key={key}
+                                                                            onClick={async () => {
+                                                                                setOpenStatusId(null);
+                                                                                if (key !== s.status) await handleStatusChange(s, key);
+                                                                            }}
+                                                                            className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-neutral-50 transition-colors ${key === s.status ? 'font-bold' : ''
+                                                                                }`}
+                                                                        >
+                                                                            <span className={`w-2 h-2 rounded-full ${val.dot}`} />
+                                                                            {val.label}
+                                                                            {key === s.status && <Check className="h-3 w-3 ml-auto text-primary" />}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    {/* Video */}
+                                                    <td className="px-4 py-3 text-center">
+                                                        <Link href={getSessionLink(s.id)} target="_blank" rel="noopener noreferrer">
+                                                            <Button size="sm" variant="outline" className="h-7 text-xs border-primary text-primary hover:bg-primary/10">
+                                                                <Video className="h-3 w-3 mr-1" /> Video
+                                                            </Button>
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             )}
                         </div>
                     </div>
