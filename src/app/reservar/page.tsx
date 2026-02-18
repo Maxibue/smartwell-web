@@ -33,6 +33,7 @@ export default function ReservarPage() {
     const professionalId = searchParams.get("professional");
 
     const [loading, setLoading] = useState(true);
+    const [authChecked, setAuthChecked] = useState(false); // true cuando Firebase resolvió el estado de auth
     const [booking, setBooking] = useState(false);
     const [professional, setProfessional] = useState<Professional | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -43,9 +44,12 @@ export default function ReservarPage() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             if (!user) {
-                router.push("/login?redirect=/reservar");
+                // Guardar la URL completa para redirigir de vuelta después del login
+                const currentUrl = window.location.pathname + window.location.search;
+                router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
             } else {
                 setUserId(user.uid);
+                setAuthChecked(true); // Auth resuelto: ahora sí podemos hacer queries
             }
         });
 
@@ -264,7 +268,8 @@ export default function ReservarPage() {
         }
     };
 
-    if (loading) {
+    // Mostrar spinner mientras carga el profesional O mientras se verifica el auth
+    if (loading || !authChecked) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

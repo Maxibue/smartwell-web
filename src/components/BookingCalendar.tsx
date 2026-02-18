@@ -175,25 +175,32 @@ export default function BookingCalendar({ professionalId, onSelectSlot }: Bookin
             const dateStr = toDateStrBA(date);
 
             // Consultar turnos ya reservados en AMBAS colecciones
+            // NOTA: No filtramos por status en Firestore para evitar requerir índices compuestos.
+            // Filtramos en memoria.
             const [apptSnap, bookSnap] = await Promise.all([
                 getDocs(query(
                     collection(db, "appointments"),
                     where("professionalId", "==", professionalId),
                     where("date", "==", dateStr),
-                    where("status", "in", ["pending", "confirmed"])
                 )),
                 getDocs(query(
                     collection(db, "bookings"),
                     where("professionalId", "==", professionalId),
                     where("date", "==", dateStr),
-                    where("status", "in", ["pending", "confirmed"])
                 )),
             ]);
 
+            // Filtrar en memoria: solo los que bloquean horario (no cancelados)
+            const BLOCKING_STATUSES = new Set(["pending", "confirmed", "completed"]);
             const booked = new Set<string>([
-                ...apptSnap.docs.map(d => d.data().time as string),
-                ...bookSnap.docs.map(d => d.data().time as string),
+                ...apptSnap.docs
+                    .filter(d => BLOCKING_STATUSES.has(d.data().status))
+                    .map(d => d.data().time as string),
+                ...bookSnap.docs
+                    .filter(d => BLOCKING_STATUSES.has(d.data().status))
+                    .map(d => d.data().time as string),
             ]);
+
 
             // Hora actual en BA (para filtrar slots pasados si es hoy)
             const nowBA = nowInBA();
