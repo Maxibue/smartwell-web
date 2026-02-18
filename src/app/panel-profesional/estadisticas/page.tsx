@@ -51,8 +51,15 @@ export default function ProfessionalStatsPage() {
 
     if (!monthlyReport) {
         return (
-            <div className="text-center py-12">
-                <p className="text-text-secondary">No hay datos disponibles</p>
+            <div className="text-center py-12 space-y-2">
+                <p className="text-text-secondary">No se pudieron cargar las estadísticas.</p>
+                <p className="text-xs text-text-muted">Revisá la consola del navegador para más detalles.</p>
+                <button
+                    onClick={() => user && loadStats(user.uid)}
+                    className="mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90"
+                >
+                    Reintentar
+                </button>
             </div>
         );
     }

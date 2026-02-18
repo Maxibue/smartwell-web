@@ -87,24 +87,46 @@ export async function getMonthlyReport(
     const startKey = toDateKey(monthStart);
     const endKey = toDateKey(monthEnd);
 
+    console.log(`[Stats] getMonthlyReport uid=${professionalId} rango=${startKey} → ${endKey}`);
+
+    // Reporte vacío para retornar en caso de error
+    const emptyReport: MonthlyReport = {
+        month: formatMonthES(targetMonth),
+        totalSessions: 0,
+        completedSessions: 0,
+        cancelledSessions: 0,
+        totalRevenue: 0,
+        averageSessionPrice: 0,
+        newPatients: 0,
+        returningPatients: 0,
+        cancellationRate: 0,
+        dailyStats: [],
+    };
+
     try {
         // Consultar tanto 'appointments' como 'bookings'
+        // NOTA: No filtramos por fecha en Firestore para evitar requerir índices compuestos.
+        // Filtramos por fecha en memoria.
         const [apptSnap, bookSnap] = await Promise.all([
             getDocs(query(
                 collection(db, 'appointments'),
-                where('professionalId', '==', professionalId),
-                where('date', '>=', startKey),
-                where('date', '<=', endKey)
-            )),
+                where('professionalId', '==', professionalId)
+            )).catch(e => { console.warn('[Stats] appointments query error:', e); return { docs: [] } as any; }),
             getDocs(query(
                 collection(db, 'bookings'),
-                where('professionalId', '==', professionalId),
-                where('date', '>=', startKey),
-                where('date', '<=', endKey)
-            )),
+                where('professionalId', '==', professionalId)
+            )).catch(e => { console.warn('[Stats] bookings query error:', e); return { docs: [] } as any; }),
         ]);
 
-        const allDocs = [...apptSnap.docs, ...bookSnap.docs];
+        console.log(`[Stats] docs encontrados: appointments=${apptSnap.docs.length}, bookings=${bookSnap.docs.length}`);
+
+        // Filtrar por rango de fechas en memoria
+        const allDocs = [...apptSnap.docs, ...bookSnap.docs].filter(d => {
+            const date = d.data().date || '';
+            return date >= startKey && date <= endKey;
+        });
+
+        console.log(`[Stats] docs en el mes: ${allDocs.length}`);
 
         let totalSessions = 0;
         let completedSessions = 0;
@@ -163,8 +185,8 @@ export async function getMonthlyReport(
             dailyStats,
         };
     } catch (error) {
-        console.error('Error getting monthly report:', error);
-        throw error;
+        console.error('[Stats] Error en getMonthlyReport:', error);
+        return emptyReport; // Retornar vacío en lugar de lanzar
     }
 }
 
@@ -185,19 +207,19 @@ export async function getYearlyReport(
         const [apptSnap, bookSnap] = await Promise.all([
             getDocs(query(
                 collection(db, 'appointments'),
-                where('professionalId', '==', professionalId),
-                where('date', '>=', startKey),
-                where('date', '<=', endKey)
-            )),
+                where('professionalId', '==', professionalId)
+            )).catch(e => { console.warn('[Stats] yearly appointments error:', e); return { docs: [] } as any; }),
             getDocs(query(
                 collection(db, 'bookings'),
-                where('professionalId', '==', professionalId),
-                where('date', '>=', startKey),
-                where('date', '<=', endKey)
-            )),
+                where('professionalId', '==', professionalId)
+            )).catch(e => { console.warn('[Stats] yearly bookings error:', e); return { docs: [] } as any; }),
         ]);
 
-        const allDocs = [...apptSnap.docs, ...bookSnap.docs];
+        // Filtrar por año en memoria
+        const allDocs = [...apptSnap.docs, ...bookSnap.docs].filter(d => {
+            const date = d.data().date || '';
+            return date >= startKey && date <= endKey;
+        });
 
         let totalSessions = 0;
         let totalRevenue = 0;
