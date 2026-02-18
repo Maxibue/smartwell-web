@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { User as UserIcon, Mail, Phone, MapPin, Award, DollarSign, Clock, Loader2, Save, Info, Camera, CheckCircle } from "lucide-react";
+import { User as UserIcon, Mail, Phone, Award, DollarSign, Clock, Loader2, Save, Info, CheckCircle, Plus, Trash2 } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { PROFESSIONAL_CATEGORIES, getCategoryName } from "@/lib/categories";
+import { PROFESSIONAL_CATEGORIES, getCategoryName, getSubcategories } from "@/lib/categories";
 import { sanitizeText, sanitizeHTML, sanitizePhone, sanitizeURL, detectXSS } from "@/lib/sanitize";
 
 interface ProfessionalProfile {
@@ -18,7 +18,6 @@ interface ProfessionalProfile {
     phone?: string;
     title: string;
     bio: string;
-    specialty: string;
     category: string;
     price: string;
     duration: string;
@@ -27,16 +26,29 @@ interface ProfessionalProfile {
     tags?: string[];
 }
 
+interface Service {
+    id: string; // UUID local para el key de React
+    name: string; // Nombre del servicio (viene del dropdown de subcategorias)
+    description: string;
+    duration: number; // minutos
+    price: number; // ARS
+}
+
 // Use centralized categories
 const CATEGORIES = PROFESSIONAL_CATEGORIES.map(cat => ({
     id: cat.id,
     name: cat.name
 }));
 
+function newService(): Service {
+    return { id: crypto.randomUUID(), name: '', description: '', duration: 50, price: 0 };
+}
+
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [services, setServices] = useState<Service[]>([newService()]);
 
     const [profile, setProfile] = useState<ProfessionalProfile>({
         uid: "",
@@ -44,8 +56,7 @@ export default function ProfilePage() {
         email: "",
         title: "",
         bio: "",
-        specialty: "",
-        category: "Salud Mental",
+        category: "salud-mental",
         price: "",
         duration: "50",
         image: "",
@@ -68,15 +79,24 @@ export default function ProfilePage() {
                             email: data.email || currentUser.email || "",
                             phone: data.phone || "",
                             title: data.title || "",
-                            bio: data.description || "", // Mapping description to bio
-                            specialty: data.specialty || "",
-                            category: data.category || "Salud Mental",
+                            bio: data.description || "",
+                            category: data.category || "salud-mental",
                             price: data.price?.toString() || "",
                             duration: data.duration?.toString() || "50",
                             image: data.image || data.profileImage || "",
                             status: data.status || "pending",
                             tags: data.tags || []
                         });
+                        // Cargar servicios guardados
+                        if (Array.isArray(data.services) && data.services.length > 0) {
+                            setServices(data.services.map((s: any) => ({
+                                id: s.id || crypto.randomUUID(),
+                                name: s.name || '',
+                                description: s.description || '',
+                                duration: s.duration || 50,
+                                price: s.price || 0,
+                            })));
+                        }
                     }
                 } catch (e) {
                     console.error("Error fetching profile", e);
@@ -91,12 +111,30 @@ export default function ProfilePage() {
         setProfile(prev => ({ ...prev, [field]: value }));
     };
 
+    // ── Helpers de servicios ─────────────────────────────────────────────────
+    const addService = () => setServices(prev => [...prev, newService()]);
+
+    const removeService = (id: string) =>
+        setServices(prev => prev.length > 1 ? prev.filter(s => s.id !== id) : prev);
+
+    const updateService = (id: string, field: keyof Omit<Service, 'id'>, value: string | number) =>
+        setServices(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+
+    const subcategories = getSubcategories(profile.category);
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
 
+        // Validar servicios
+        const validServices = services.filter(s => s.name.trim() !== '');
+        if (validServices.length === 0) {
+            alert('Por favor agrega al menos un servicio con nombre.');
+            return;
+        }
+
         // ✅ SEGURIDAD: Detectar posibles ataques XSS
-        const fieldsToCheck = [profile.name, profile.title, profile.bio, profile.specialty];
+        const fieldsToCheck = [profile.name, profile.title, profile.bio];
         for (const field of fieldsToCheck) {
             if (detectXSS(field)) {
                 alert("⚠️ Se detectó contenido sospechoso en el formulario. Por favor, evitá usar caracteres especiales como <script>, javascript:, etc.");
@@ -111,9 +149,20 @@ export default function ProfilePage() {
             const sanitizedName = sanitizeText(profile.name);
             const sanitizedTitle = sanitizeText(profile.title);
             const sanitizedBio = sanitizeHTML(profile.bio);
-            const sanitizedSpecialty = sanitizeText(profile.specialty);
             const sanitizedPhone = profile.phone ? sanitizePhone(profile.phone) : "";
             const sanitizedImage = profile.image ? sanitizeURL(profile.image) : "";
+
+            // Sanitizar servicios
+            const sanitizedServices = validServices.map(s => ({
+                id: s.id,
+                name: sanitizeText(s.name),
+                description: sanitizeText(s.description),
+                duration: Math.max(1, Math.round(Number(s.duration) || 50)),
+                price: Math.max(0, Number(s.price) || 0),
+            }));
+
+            // Precio y duración base = primer servicio (para compatibilidad)
+            const baseService = sanitizedServices[0];
 
             const docRef = doc(db, "professionals", user.uid);
             await updateDoc(docRef, {
@@ -121,24 +170,25 @@ export default function ProfilePage() {
                 phone: sanitizedPhone,
                 title: sanitizedTitle,
                 description: sanitizedBio,
-                specialty: sanitizedSpecialty,
                 category: profile.category,
-                price: parseFloat(profile.price) || 0,
-                duration: parseInt(profile.duration) || 50,
+                services: sanitizedServices,
+                // Compatibilidad con campos legacy
+                specialty: baseService.name,
+                price: baseService.price,
+                duration: baseService.duration,
                 image: sanitizedImage,
                 updatedAt: new Date()
             });
 
-            // Actualizar estado local con valores sanitizados
             setProfile(prev => ({
                 ...prev,
                 name: sanitizedName,
                 title: sanitizedTitle,
                 bio: sanitizedBio,
-                specialty: sanitizedSpecialty,
                 phone: sanitizedPhone,
                 image: sanitizedImage,
             }));
+            setServices(sanitizedServices);
 
             alert("✅ Perfil actualizado correctamente.");
         } catch (error) {
@@ -150,14 +200,14 @@ export default function ProfilePage() {
     };
 
     const isProfileComplete = () => {
+        const validServices = services.filter(s => s.name.trim() !== '');
         return (
             profile.name.trim() !== "" &&
             profile.title.trim() !== "" &&
             profile.bio.trim().length >= 100 &&
-            profile.specialty.trim() !== "" &&
             profile.category.trim() !== "" &&
-            profile.price !== "" &&
-            parseFloat(profile.price) > 0
+            validServices.length > 0 &&
+            validServices.some(s => s.price > 0)
         );
     };
 
@@ -343,66 +393,140 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 space-y-6">
-                        <h3 className="font-bold text-secondary text-lg flex items-center gap-2">
-                            <Award className="h-5 w-5 text-primary" />
-                            Especialidad y Tarifas
-                        </h3>
-
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="category">Categoría Principal</Label>
-                                <select
-                                    id="category"
-                                    value={profile.category}
-                                    onChange={(e) => handleChange('category', e.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <option value="">Seleccionar categoría</option>
-                                    {CATEGORIES.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="specialty">Especialidad Específica</Label>
-                                <Input
-                                    id="specialty"
-                                    value={profile.specialty}
-                                    onChange={(e) => handleChange('specialty', e.target.value)}
-                                    placeholder="Ej: Terapia Cognitivo Conductual"
-                                />
-                            </div>
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-bold text-secondary text-lg flex items-center gap-2">
+                                <Award className="h-5 w-5 text-primary" />
+                                Especialidad y Servicios
+                            </h3>
                         </div>
 
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="price">Precio Base por Consulta ($)</Label>
-                                <div className="relative">
-                                    <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
-                                    <Input
-                                        id="price"
-                                        type="number"
-                                        value={profile.price}
-                                        onChange={(e) => handleChange('price', e.target.value)}
-                                        className="pl-9"
-                                        placeholder="0.00"
-                                    />
-                                </div>
+                        {/* Categoría Principal */}
+                        <div className="space-y-2">
+                            <Label htmlFor="category">Categoría Principal</Label>
+                            <select
+                                id="category"
+                                value={profile.category}
+                                onChange={(e) => {
+                                    handleChange('category', e.target.value);
+                                    // Resetear nombre de servicios al cambiar categoría
+                                    setServices(prev => prev.map(s => ({ ...s, name: '' })));
+                                }}
+                                className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                            >
+                                <option value="">Seleccionar categoría</option>
+                                {CATEGORIES.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Lista de Servicios */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold text-secondary">Servicios Ofrecidos</Label>
+                                <button
+                                    type="button"
+                                    onClick={addService}
+                                    className="flex items-center gap-1.5 text-sm text-primary font-semibold hover:text-primary-dark transition-colors px-3 py-1.5 rounded-lg border border-primary/30 hover:bg-primary/5"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Agregar Servicio
+                                </button>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="duration">Duración Estándar (min)</Label>
-                                <div className="relative">
-                                    <Clock className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
-                                    <Input
-                                        id="duration"
-                                        type="number"
-                                        value={profile.duration}
-                                        onChange={(e) => handleChange('duration', e.target.value)}
-                                        className="pl-9"
-                                        placeholder="50"
-                                    />
+
+                            {services.map((service, idx) => (
+                                <div
+                                    key={service.id}
+                                    className="border border-neutral-200 rounded-xl p-4 space-y-4 bg-neutral-50/50 relative"
+                                >
+                                    {/* Header del servicio */}
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-text-muted uppercase tracking-wide">
+                                            Servicio {idx + 1}
+                                        </span>
+                                        {services.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeService(service.id)}
+                                                className="text-red-400 hover:text-red-600 transition-colors p-1 rounded"
+                                                title="Eliminar servicio"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Nombre del servicio (dropdown) */}
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor={`service-name-${service.id}`}>Servicio</Label>
+                                        <select
+                                            id={`service-name-${service.id}`}
+                                            value={service.name}
+                                            onChange={(e) => updateService(service.id, 'name', e.target.value)}
+                                            className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                                            required
+                                        >
+                                            <option value="">Seleccionar servicio...</option>
+                                            {subcategories.map(sub => (
+                                                <option key={sub} value={sub}>{sub}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Descripción */}
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor={`service-desc-${service.id}`}>Descripción</Label>
+                                        <Textarea
+                                            id={`service-desc-${service.id}`}
+                                            value={service.description}
+                                            onChange={(e) => updateService(service.id, 'description', e.target.value)}
+                                            placeholder="Describí en qué consiste este servicio..."
+                                            className="resize-none text-sm"
+                                            rows={2}
+                                        />
+                                    </div>
+
+                                    {/* Duración y Precio */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor={`service-dur-${service.id}`}>Duración (min)</Label>
+                                            <div className="relative">
+                                                <Clock className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+                                                <Input
+                                                    id={`service-dur-${service.id}`}
+                                                    type="number"
+                                                    min={1}
+                                                    value={service.duration}
+                                                    onChange={(e) => updateService(service.id, 'duration', Number(e.target.value))}
+                                                    className="pl-9"
+                                                    placeholder="50"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor={`service-price-${service.id}`}>Precio ($)</Label>
+                                            <div className="relative">
+                                                <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+                                                <Input
+                                                    id={`service-price-${service.id}`}
+                                                    type="number"
+                                                    min={0}
+                                                    value={service.price}
+                                                    onChange={(e) => updateService(service.id, 'price', Number(e.target.value))}
+                                                    className="pl-9"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            ))}
+
+                            {subcategories.length === 0 && profile.category && (
+                                <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                    Seleccioná una categoría principal para ver los servicios disponibles.
+                                </p>
+                            )}
                         </div>
                     </div>
 
