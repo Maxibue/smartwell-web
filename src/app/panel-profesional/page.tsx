@@ -43,39 +43,64 @@ function formatARS(n: number) {
     }).format(n);
 }
 
-// Helpers de fecha sin date-fns
+// ─── Zona horaria Buenos Aires (igual que BookingCalendar) ───────────────────
+const TZ = "America/Argentina/Buenos_Aires";
+
+function nowInBA(): Date {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+        timeZone: TZ,
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hour12: false,
+    });
+    const parts = fmt.formatToParts(new Date());
+    const get = (t: string) => parts.find(p => p.type === t)?.value ?? "0";
+    return new Date(
+        Number(get("year")), Number(get("month")) - 1, Number(get("day")),
+        Number(get("hour")), Number(get("minute"))
+    );
+}
+
+function todayStrBA(): string {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
+}
+
 function parseDate(dateStr: string): Date {
-    // dateStr: "YYYY-MM-DD"
     const [y, m, d] = dateStr.split("-").map(Number);
     return new Date(y, m - 1, d);
 }
 
 function isDateToday(dateStr: string): boolean {
-    const d = parseDate(dateStr);
-    const today = new Date();
-    return d.getFullYear() === today.getFullYear() &&
-        d.getMonth() === today.getMonth() &&
-        d.getDate() === today.getDate();
+    return dateStr === todayStrBA();
 }
 
+/** Retorna true si la sesión es futura (fecha+hora > ahora en BA) */
 function isDateFuture(dateStr: string, time: string): boolean {
+    if (!dateStr) return false;
+    const now = nowInBA();
+    const todayStr = todayStrBA();
+    if (dateStr > todayStr) return true;
+    if (dateStr < todayStr) return false;
+    // mismo día: comparar hora
     const [h, min] = (time || "00:00").split(":").map(Number);
-    const d = parseDate(dateStr);
-    d.setHours(h, min, 0, 0);
-    return d > new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    return (h * 60 + min) > nowMin;
 }
 
 const MONTH_NAMES_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const DAY_NAMES_SHORT = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 
 function formatDateShort(dateStr: string): string {
-    const d = parseDate(dateStr);
-    return `${DAY_NAMES_SHORT[d.getDay()]} ${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
+    // Parsear como fecha local (YYYY-MM-DD) para evitar desfase de zona horaria
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    return `${DAY_NAMES_SHORT[date.getDay()]} ${d} ${MONTH_NAMES_SHORT[m - 1]}`;
 }
 
 function formatDateMedium(dateStr: string): string {
-    const d = parseDate(dateStr);
-    return `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return `${d} ${MONTH_NAMES_SHORT[m - 1]}`;
 }
 
 
@@ -214,15 +239,15 @@ export default function ProfessionalDashboard() {
         meetingLink?.trim() ? meetingLink : `https://meet.jit.si/SmartWell-${id}`;
 
     // ── KPIs ────────────────────────────────────────────────────────────────
-    const now = new Date();
     const todaySessions = sessions.filter(
-        (s) => s.status !== "cancelled" && s.date && isDateToday(s.date)
+        (s) => !['cancelled'].includes(s.status) && s.date && isDateToday(s.date)
     );
     const upcomingSessions = sessions.filter(
-        (s) => s.status !== "cancelled" && s.date && isDateFuture(s.date, s.time)
+        (s) => !['cancelled'].includes(s.status) && s.date && isDateFuture(s.date, s.time)
     );
     const confirmedSessions = sessions.filter((s) => s.status === "confirmed");
     const pendingSessions = sessions.filter((s) => s.status === "pending");
+    const now = nowInBA();
     const monthRevenue = sessions
         .filter((s) => {
             if (s.status === "cancelled") return false;
