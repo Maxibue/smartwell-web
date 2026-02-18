@@ -65,6 +65,7 @@ export default function DisponibilidadPage() {
     const [sessionDuration, setSessionDuration] = useState(50);
     const [bufferTime, setBufferTime] = useState(10);
     const [professionalId, setProfessionalId] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -146,14 +147,18 @@ export default function DisponibilidadPage() {
     };
 
     const handleSave = async () => {
-        if (!professionalId) return;
+        console.log('[Disponibilidad] handleSave llamado, professionalId:', professionalId);
+        if (!professionalId) {
+            setSaveError('No hay usuario autenticado. Recargá la página.');
+            return;
+        }
 
         // Validar que todos los slots tengan start < end
         for (const day of ORDERED_DAYS) {
             if (!availability[day].enabled) continue;
             for (const slot of availability[day].slots) {
                 if (slot.start >= slot.end) {
-                    alert(`⚠️ El horario de ${DAYS_ES[day]} tiene un rango inválido: ${slot.start} - ${slot.end}. El inicio debe ser antes del fin.`);
+                    setSaveError(`Horario inválido en ${DAYS_ES[day]}: ${slot.start} debe ser antes de ${slot.end}`);
                     return;
                 }
             }
@@ -161,20 +166,24 @@ export default function DisponibilidadPage() {
 
         setSaving(true);
         setSaveSuccess(false);
-        try {
-            // Usar setDoc con merge:true para que funcione aunque el doc no exista
-            await setDoc(doc(db, "professionals", professionalId), {
-                availability,
-                sessionDuration,
-                bufferTime,
-                updatedAt: new Date(),
-            }, { merge: true });
+        setSaveError(null);
 
+        const dataToSave = {
+            availability,
+            sessionDuration,
+            bufferTime,
+            updatedAt: new Date(),
+        };
+        console.log('[Disponibilidad] Guardando en professionals/' + professionalId + ':', JSON.stringify(dataToSave, null, 2));
+
+        try {
+            await setDoc(doc(db, "professionals", professionalId), dataToSave, { merge: true });
+            console.log('[Disponibilidad] ✅ Guardado exitoso');
             setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 3000);
-        } catch (error) {
-            console.error("Error saving availability:", error);
-            alert("❌ Error al guardar la disponibilidad. Verificá tu conexión.");
+            setTimeout(() => setSaveSuccess(false), 4000);
+        } catch (error: any) {
+            console.error('[Disponibilidad] ❌ Error al guardar:', error);
+            setSaveError(`Error: ${error?.message || 'Error desconocido'}. Código: ${error?.code || 'N/A'}`);
         } finally {
             setSaving(false);
         }
@@ -190,12 +199,33 @@ export default function DisponibilidadPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold text-secondary">Configurar Disponibilidad</h1>
-                <p className="text-text-secondary mt-1">
-                    Define tus horarios de atención para que los pacientes puedan reservar turnos
-                </p>
+            {/* Header + Sticky Save */}
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-secondary">Configurar Disponibilidad</h1>
+                    <p className="text-text-secondary mt-1">
+                        Define tus horarios de atención para que los pacientes puedan reservar turnos
+                    </p>
+                </div>
+                {/* Botón guardar sticky arriba */}
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <Button onClick={handleSave} disabled={saving} size="lg">
+                        {saving ? (
+                            <><Loader2 className="h-5 w-5 animate-spin mr-2" />Guardando...</>
+                        ) : (
+                            <><Save className="h-5 w-5 mr-2" />Guardar</>
+                        )}
+                    </Button>
+                    {saveSuccess && (
+                        <span className="text-green-600 text-xs font-semibold">✅ ¡Guardado!</span>
+                    )}
+                    {saveError && (
+                        <span className="text-red-600 text-xs font-semibold max-w-xs text-right">{saveError}</span>
+                    )}
+                    {professionalId && (
+                        <span className="text-text-muted text-xs">ID: {professionalId.slice(0, 8)}...</span>
+                    )}
+                </div>
             </div>
 
             {/* Info Banner */}
@@ -334,27 +364,24 @@ export default function DisponibilidadPage() {
                 </div>
             </div>
 
-            {/* Save Button */}
+            {/* Save Button (bottom) */}
             <div className="flex items-center justify-end gap-4">
                 {saveSuccess && (
-                    <span className="flex items-center gap-2 text-green-600 font-medium text-sm animate-pulse">
+                    <span className="flex items-center gap-2 text-green-600 font-medium text-sm">
                         <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        ¡Disponibilidad guardada!
+                        ¡Disponibilidad guardada correctamente!
                     </span>
+                )}
+                {saveError && (
+                    <span className="text-red-600 text-sm font-medium">{saveError}</span>
                 )}
                 <Button onClick={handleSave} disabled={saving} size="lg">
                     {saving ? (
-                        <>
-                            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                            Guardando...
-                        </>
+                        <><Loader2 className="h-5 w-5 animate-spin mr-2" />Guardando...</>
                     ) : (
-                        <>
-                            <Save className="h-5 w-5 mr-2" />
-                            Guardar Disponibilidad
-                        </>
+                        <><Save className="h-5 w-5 mr-2" />Guardar Disponibilidad</>
                     )}
                 </Button>
             </div>
