@@ -624,25 +624,46 @@ export default function CalendarPage() {
                         {/* Day Headers */}
                         <div className="grid grid-cols-8 border-b border-neutral-200 bg-neutral-50">
                             <div className="p-3 text-xs font-semibold text-text-muted uppercase">Hora</div>
-                            {weekDays.map((day, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`p-3 text-center border-l border-neutral-200 ${isToday(day) ? 'bg-primary/10' : ''
-                                        }`}
-                                >
-                                    <div className="text-xs font-semibold text-text-muted uppercase">{DAYS[idx]}</div>
-                                    <div className={`text-lg font-bold ${isToday(day) ? 'text-primary' : 'text-secondary'}`}>
-                                        {day.getDate()}
+                            {weekDays.map((day, idx) => {
+                                const dayKey = DOW_MAP[day.getDay()] as keyof WeekAvailability;
+                                const dayAvail = availability?.[dayKey];
+                                const isUnavailable = !dayAvail?.enabled;
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`p-3 text-center border-l border-neutral-200 ${isToday(day) ? 'bg-primary/10' :
+                                                isUnavailable ? 'bg-neutral-100' : ''
+                                            }`}
+                                    >
+                                        <div className={`text-xs font-semibold uppercase ${isUnavailable ? 'text-neutral-400' : 'text-text-muted'}`}>
+                                            {DAYS[idx]}
+                                        </div>
+                                        <div className={`text-lg font-bold ${isToday(day) ? 'text-primary' : isUnavailable ? 'text-neutral-400' : 'text-secondary'}`}>
+                                            {day.getDate()}
+                                        </div>
+                                        {/* Intervalos de disponibilidad */}
+                                        {!isUnavailable && dayAvail?.slots && dayAvail.slots.length > 0 && (
+                                            <div className="mt-1 space-y-0.5">
+                                                {dayAvail.slots.map((slot, si) => (
+                                                    <div key={si} className="text-[9px] text-primary/70 font-medium leading-tight">
+                                                        {slot.start}–{slot.end}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {isUnavailable && (
+                                            <div className="mt-1 text-[9px] text-neutral-400">No disponible</div>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         {/* Time Slots */}
                         <div className="relative">
                             {HOURS.map((hour) => (
-                                <div key={hour} className="grid grid-cols-8 border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
-                                    <div className="p-3 text-sm font-medium text-text-secondary border-r border-neutral-200">
+                                <div key={hour} className="grid grid-cols-8 border-b border-neutral-100">
+                                    <div className="p-3 text-sm font-medium text-text-secondary border-r border-neutral-200 bg-white">
                                         {hour.toString().padStart(2, '0')}:00
                                     </div>
 
@@ -655,10 +676,10 @@ export default function CalendarPage() {
                                                 onClick={() => handleSlotClick(day, hour)}
                                                 className={`p-2 border-l border-neutral-100 min-h-[80px] cursor-pointer transition-colors
                                                     ${outsideAvail
-                                                        ? 'bg-amber-50/70 hover:bg-amber-100/60'
+                                                        ? 'bg-neutral-100 hover:bg-neutral-200/60'
                                                         : isToday(day)
                                                             ? 'bg-primary/5 hover:bg-primary/10'
-                                                            : 'hover:bg-primary/5'
+                                                            : 'bg-white hover:bg-primary/5'
                                                     }`}
                                             >
                                                 {appointment ? (
@@ -672,7 +693,7 @@ export default function CalendarPage() {
                                                     </div>
                                                 ) : outsideAvail ? (
                                                     <div className="h-full flex items-center justify-center">
-                                                        <span className="text-xs text-amber-400 opacity-60 select-none">—</span>
+                                                        <span className="text-xs text-neutral-400 opacity-60 select-none">—</span>
                                                     </div>
                                                 ) : (
                                                     <div className="h-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
