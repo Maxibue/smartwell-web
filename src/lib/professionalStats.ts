@@ -3,10 +3,9 @@
  * Handles analytics, revenue reports, and patient management
  */
 
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
-import { startOfMonth, endOfMonth, startOfYear, endOfYear, format, subMonths } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from 'date-fns';
 
 export interface DailyStats {
     date: string;
@@ -59,6 +58,23 @@ export interface PatientStats {
 }
 
 /**
+ * Devuelve true si el status cuenta como sesión realizada (completada o confirmada)
+ */
+function isCompletedStatus(status: string): boolean {
+    return status === 'completed' || status === 'confirmed';
+}
+
+/** Formatea fecha como 'MMMM yyyy' en español */
+function formatMonthES(date: Date): string {
+    return new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' }).format(date);
+}
+
+/** Formatea fecha como 'yyyy-MM-dd' */
+function toDateKey(date: Date): string {
+    return date.toISOString().slice(0, 10);
+}
+
+/**
  * Get monthly statistics and report
  */
 export async function getMonthlyReport(
@@ -68,16 +84,27 @@ export async function getMonthlyReport(
     const targetMonth = month || new Date();
     const monthStart = startOfMonth(targetMonth);
     const monthEnd = endOfMonth(targetMonth);
+    const startKey = toDateKey(monthStart);
+    const endKey = toDateKey(monthEnd);
 
     try {
-        const q = query(
-            collection(db, 'appointments'),
-            where('professionalId', '==', professionalId),
-            where('date', '>=', format(monthStart, 'yyyy-MM-dd')),
-            where('date', '<=', format(monthEnd, 'yyyy-MM-dd'))
-        );
+        // Consultar tanto 'appointments' como 'bookings'
+        const [apptSnap, bookSnap] = await Promise.all([
+            getDocs(query(
+                collection(db, 'appointments'),
+                where('professionalId', '==', professionalId),
+                where('date', '>=', startKey),
+                where('date', '<=', endKey)
+            )),
+            getDocs(query(
+                collection(db, 'bookings'),
+                where('professionalId', '==', professionalId),
+                where('date', '>=', startKey),
+                where('date', '<=', endKey)
+            )),
+        ]);
 
-        const querySnapshot = await getDocs(q);
+        const allDocs = [...apptSnap.docs, ...bookSnap.docs];
 
         let totalSessions = 0;
         let completedSessions = 0;
@@ -86,36 +113,36 @@ export async function getMonthlyReport(
         const uniquePatients = new Set<string>();
         const dailyStatsMap = new Map<string, DailyStats>();
 
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
+        allDocs.forEach((docSnap) => {
+            const data = docSnap.data();
             totalSessions++;
 
-            if (data.status === 'completed') {
+            const completed = isCompletedStatus(data.status);
+            const cancelled = data.status === 'cancelled';
+
+            if (completed) {
                 completedSessions++;
-                totalRevenue += data.price || 0;
+                totalRevenue += Number(data.price || data.servicePrice || 0);
             }
 
-            if (data.status === 'cancelled') {
+            if (cancelled) {
                 cancelledSessions++;
             }
 
-            uniquePatients.add(data.userId);
+            // Paciente único: usar userId, patientId o nombre+email como fallback
+            const patientKey = data.userId || data.patientId ||
+                `${data.patientName || data.userName || 'unknown'}_${data.patientEmail || data.userEmail || ''}`;
+            uniquePatients.add(patientKey);
 
             // Daily stats
             const dateKey = data.date;
             if (!dailyStatsMap.has(dateKey)) {
-                dailyStatsMap.set(dateKey, {
-                    date: dateKey,
-                    sessions: 0,
-                    revenue: 0,
-                    newPatients: 0,
-                });
+                dailyStatsMap.set(dateKey, { date: dateKey, sessions: 0, revenue: 0, newPatients: 0 });
             }
-
             const dayStats = dailyStatsMap.get(dateKey)!;
             dayStats.sessions++;
-            if (data.status === 'completed') {
-                dayStats.revenue += data.price || 0;
+            if (completed) {
+                dayStats.revenue += Number(data.price || data.servicePrice || 0);
             }
         });
 
@@ -124,14 +151,14 @@ export async function getMonthlyReport(
         );
 
         return {
-            month: format(targetMonth, 'MMMM yyyy', { locale: es }),
+            month: formatMonthES(targetMonth),
             totalSessions,
             completedSessions,
             cancelledSessions,
             totalRevenue,
             averageSessionPrice: completedSessions > 0 ? totalRevenue / completedSessions : 0,
             newPatients: uniquePatients.size,
-            returningPatients: 0, // TODO: Calculate based on historical data
+            returningPatients: 0,
             cancellationRate: totalSessions > 0 ? (cancelledSessions / totalSessions) * 100 : 0,
             dailyStats,
         };
@@ -151,46 +178,53 @@ export async function getYearlyReport(
     const targetYear = year || new Date().getFullYear();
     const yearStart = startOfYear(new Date(targetYear, 0, 1));
     const yearEnd = endOfYear(new Date(targetYear, 0, 1));
+    const startKey = toDateKey(yearStart);
+    const endKey = toDateKey(yearEnd);
 
     try {
-        const q = query(
-            collection(db, 'appointments'),
-            where('professionalId', '==', professionalId),
-            where('date', '>=', format(yearStart, 'yyyy-MM-dd')),
-            where('date', '<=', format(yearEnd, 'yyyy-MM-dd'))
-        );
+        const [apptSnap, bookSnap] = await Promise.all([
+            getDocs(query(
+                collection(db, 'appointments'),
+                where('professionalId', '==', professionalId),
+                where('date', '>=', startKey),
+                where('date', '<=', endKey)
+            )),
+            getDocs(query(
+                collection(db, 'bookings'),
+                where('professionalId', '==', professionalId),
+                where('date', '>=', startKey),
+                where('date', '<=', endKey)
+            )),
+        ]);
 
-        const querySnapshot = await getDocs(q);
+        const allDocs = [...apptSnap.docs, ...bookSnap.docs];
 
         let totalSessions = 0;
         let totalRevenue = 0;
         const monthlyMap = new Map<string, { sessions: number; revenue: number }>();
         const servicesMap = new Map<string, { count: number; revenue: number }>();
 
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
+        allDocs.forEach((docSnap) => {
+            const data = docSnap.data();
 
-            if (data.status === 'completed') {
+            if (isCompletedStatus(data.status)) {
                 totalSessions++;
-                totalRevenue += data.price || 0;
+                const price = Number(data.price || data.servicePrice || 0);
+                totalRevenue += price;
 
                 // Monthly breakdown
-                const monthKey = format(new Date(data.date), 'MMM', { locale: es });
-                if (!monthlyMap.has(monthKey)) {
-                    monthlyMap.set(monthKey, { sessions: 0, revenue: 0 });
-                }
+                const monthKey = new Intl.DateTimeFormat('es-AR', { month: 'short' }).format(new Date(data.date + 'T00:00:00'));
+                if (!monthlyMap.has(monthKey)) monthlyMap.set(monthKey, { sessions: 0, revenue: 0 });
                 const monthData = monthlyMap.get(monthKey)!;
                 monthData.sessions++;
-                monthData.revenue += data.price || 0;
+                monthData.revenue += price;
 
                 // Services breakdown
-                const serviceName = data.professionalSpecialty || 'Consulta General';
-                if (!servicesMap.has(serviceName)) {
-                    servicesMap.set(serviceName, { count: 0, revenue: 0 });
-                }
+                const serviceName = data.service || data.serviceName || data.professionalSpecialty || 'Consulta General';
+                if (!servicesMap.has(serviceName)) servicesMap.set(serviceName, { count: 0, revenue: 0 });
                 const serviceData = servicesMap.get(serviceName)!;
                 serviceData.count++;
-                serviceData.revenue += data.price || 0;
+                serviceData.revenue += price;
             }
         });
 
@@ -201,21 +235,11 @@ export async function getYearlyReport(
         }));
 
         const topServices = Array.from(servicesMap.entries())
-            .map(([name, data]) => ({
-                name,
-                count: data.count,
-                revenue: data.revenue,
-            }))
+            .map(([name, data]) => ({ name, count: data.count, revenue: data.revenue }))
             .sort((a, b) => b.revenue - a.revenue)
             .slice(0, 5);
 
-        return {
-            year: targetYear,
-            totalSessions,
-            totalRevenue,
-            monthlyBreakdown,
-            topServices,
-        };
+        return { year: targetYear, totalSessions, totalRevenue, monthlyBreakdown, topServices };
     } catch (error) {
         console.error('Error getting yearly report:', error);
         throw error;
@@ -241,7 +265,7 @@ export async function getPatientStats(professionalId: string): Promise<PatientSt
             lastSession: string;
         }>();
 
-        const thisMonth = format(new Date(), 'yyyy-MM');
+        const thisMonth = new Date().toISOString().slice(0, 7); // 'yyyy-MM'
         const newPatientsThisMonth = new Set<string>();
 
         querySnapshot.forEach((doc) => {
