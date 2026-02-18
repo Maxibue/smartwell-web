@@ -13,6 +13,14 @@ import { ReviewList } from "@/components/ReviewList";
 import { ReviewStatsDisplay } from "@/components/ReviewStatsDisplay";
 import { getProfessionalReviews, getReviewStats, Review, ReviewStats } from "@/lib/reviews";
 
+interface Service {
+    id: string;
+    name: string;
+    price: number;
+    duration: number;
+    description?: string;
+}
+
 interface Professional {
     firstName: string;
     lastName: string;
@@ -26,6 +34,7 @@ interface Professional {
     rating?: number;
     reviewCount?: number;
     status: string;
+    services?: Service[];
 }
 
 export default function ProfessionalProfile({ params }: { params: { id: string } }) {
@@ -40,6 +49,7 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
         ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
     });
     const [loadingReviews, setLoadingReviews] = useState(true);
+    const [selectedService, setSelectedService] = useState<Service | null>(null);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -122,6 +132,7 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
                     rating: data.rating || 5,
                     reviewCount: data.reviewCount || 0,
                     status: data.status || "pending",
+                    services: Array.isArray(data.services) ? data.services : [],
                 });
             }
         } catch (error) {
@@ -149,10 +160,12 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
 
     const handleBooking = () => {
         if (!isAuthenticated) {
-            router.push(`/login?redirect=/reservar?professional=${params.id}`);
+            const serviceParam = selectedService ? `&service=${encodeURIComponent(selectedService.id)}` : '';
+            router.push(`/login?redirect=/reservar?professional=${params.id}${serviceParam}`);
             return;
         }
-        router.push(`/reservar?professional=${params.id}`);
+        const serviceParam = selectedService ? `&service=${encodeURIComponent(selectedService.id)}` : '';
+        router.push(`/reservar?professional=${params.id}${serviceParam}`);
     };
 
     if (loading) {
@@ -314,43 +327,100 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
 
                         {/* Right Column - Booking Card */}
                         <div className="lg:col-span-1">
-                            <div className="bg-white rounded-2xl shadow-lg border border-neutral-100 p-6 sticky top-6">
-                                <div className="mb-6">
-                                    <div className="flex items-baseline gap-2 mb-4">
-                                        <span className="text-4xl font-bold text-primary">
-                                            ${professional.price}
-                                        </span>
-                                        <span className="text-text-secondary">/ sesión</span>
+                            <div className="sticky top-6 space-y-4">
+
+                                {/* Services List */}
+                                {professional.services && professional.services.length > 0 && (
+                                    <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
+                                        <h3 className="font-bold text-secondary mb-4 text-base">Servicios disponibles</h3>
+                                        <div className="space-y-2">
+                                            {professional.services.map((service) => (
+                                                <button
+                                                    key={service.id}
+                                                    onClick={() => setSelectedService(
+                                                        selectedService?.id === service.id ? null : service
+                                                    )}
+                                                    className={`w-full text-left p-3 rounded-xl border-2 transition-all ${selectedService?.id === service.id
+                                                            ? 'border-primary bg-primary/5 shadow-sm'
+                                                            : 'border-neutral-100 hover:border-primary/40 hover:bg-neutral-50'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className={`font-semibold text-sm truncate ${selectedService?.id === service.id ? 'text-primary' : 'text-secondary'
+                                                                }`}>
+                                                                {selectedService?.id === service.id && (
+                                                                    <span className="mr-1">✓</span>
+                                                                )}
+                                                                {service.name}
+                                                            </p>
+                                                            <p className="text-xs text-text-muted mt-0.5 flex items-center gap-1">
+                                                                <Clock className="h-3 w-3" />
+                                                                {service.duration} min
+                                                            </p>
+                                                            {service.description && (
+                                                                <p className="text-xs text-text-secondary mt-1 line-clamp-2">{service.description}</p>
+                                                            )}
+                                                        </div>
+                                                        <span className="font-bold text-primary text-sm whitespace-nowrap">
+                                                            ${Number(service.price).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {selectedService && (
+                                            <p className="text-xs text-text-muted mt-3 text-center">
+                                                Clic nuevamente para deseleccionar
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Booking Card */}
+                                <div className="bg-white rounded-2xl shadow-lg border border-neutral-100 p-6">
+                                    <div className="mb-6">
+                                        <div className="flex items-baseline gap-2 mb-1">
+                                            <span className="text-4xl font-bold text-primary">
+                                                ${selectedService
+                                                    ? Number(selectedService.price).toLocaleString()
+                                                    : professional.price.toLocaleString()}
+                                            </span>
+                                            <span className="text-text-secondary">/ sesión</span>
+                                        </div>
+                                        {selectedService && (
+                                            <p className="text-xs text-primary font-medium mb-3">{selectedService.name}</p>
+                                        )}
+
+                                        <div className="space-y-3 text-sm mt-4">
+                                            <div className="flex items-center gap-2 text-text-secondary">
+                                                <Clock className="h-4 w-4 text-primary" />
+                                                <span>Duración: {selectedService?.duration || professional.sessionDuration} minutos</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-text-secondary">
+                                                <Video className="h-4 w-4 text-primary" />
+                                                <span>Modalidad: Videollamada</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-text-secondary">
+                                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                                <span>Confirmación inmediata</span>
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <div className="space-y-3 text-sm">
-                                        <div className="flex items-center gap-2 text-text-secondary">
-                                            <Clock className="h-4 w-4 text-primary" />
-                                            <span>Duración: {professional.sessionDuration} minutos</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-text-secondary">
-                                            <Video className="h-4 w-4 text-primary" />
-                                            <span>Modalidad: Videollamada</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-text-secondary">
-                                            <CheckCircle className="h-4 w-4 text-green-600" />
-                                            <span>Confirmación inmediata</span>
-                                        </div>
-                                    </div>
+                                    <Button
+                                        onClick={handleBooking}
+                                        className="w-full text-lg h-12 mb-4"
+                                        size="lg"
+                                    >
+                                        <Calendar className="h-5 w-5 mr-2" />
+                                        Reservar Turno
+                                    </Button>
+
+                                    <p className="text-xs text-text-secondary text-center">
+                                        Seleccioná tu horario preferido en el siguiente paso
+                                    </p>
                                 </div>
-
-                                <Button
-                                    onClick={handleBooking}
-                                    className="w-full text-lg h-12 mb-4"
-                                    size="lg"
-                                >
-                                    <Calendar className="h-5 w-5 mr-2" />
-                                    Reservar Turno
-                                </Button>
-
-                                <p className="text-xs text-text-secondary text-center">
-                                    Seleccioná tu horario preferido en el siguiente paso
-                                </p>
                             </div>
                         </div>
                     </div>
