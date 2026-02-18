@@ -453,7 +453,9 @@ export default function CalendarPage() {
     const isSlotOutsideAvailability = (day: Date, hour: number): boolean => {
         if (!availability) return false; // Sin config → no marcar nada
 
-        const dayKey = DOW_MAP[day.getDay()] as keyof WeekAvailability;
+        // Usamos getDay() que devuelve 0=Dom, 1=Lun, ..., 6=Sáb
+        const dowIndex = day.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+        const dayKey = DOW_MAP[dowIndex] as keyof WeekAvailability;
         const dayAvail = availability[dayKey];
 
         // Día no habilitado → fuera de disponibilidad
@@ -463,17 +465,15 @@ export default function CalendarPage() {
         if (!dayAvail.slots || dayAvail.slots.length === 0) return false;
 
         // Verificar si la hora cae dentro de algún bloque
-        // El slot de 1 hora va de hour:00 a hour+1:00
-        const slotStart = hour * 60;
-        const slotEnd = slotStart + 60;
+        const slotStart = hour * 60;       // inicio del slot en minutos
+        const slotEnd = slotStart + 60;    // fin del slot (1 hora)
 
         const covered = dayAvail.slots.some(s => {
-            if (!s.start || !s.end) return false; // slot malformado → ignorar
+            if (!s.start || !s.end) return false;
             const blockStart = parseMinutes(s.start);
             const blockEnd = parseMinutes(s.end);
-            if (blockStart >= blockEnd) return false; // rango inválido → ignorar
-            // Hay solapamiento si el slot empieza antes de que termine el bloque
-            // y termina después de que empiece el bloque
+            if (blockStart >= blockEnd) return false; // rango inválido
+            // El slot está cubierto si hay solapamiento
             return slotStart < blockEnd && slotEnd > blockStart;
         });
 
@@ -617,15 +617,6 @@ export default function CalendarPage() {
                     </div>
                 )}
 
-                {/* Banner: disponibilidad cargada (debug info) */}
-                {hasAvailabilityConfigured && (
-                    <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-xs text-green-700">
-                        <span>✅ Disponibilidad cargada.</span>
-                        <span className="opacity-70">
-                            Días activos: {Object.entries(availability!).filter(([, v]) => v.enabled).map(([k]) => k).join(', ')}
-                        </span>
-                    </div>
-                )}
 
                 {/* Week View */}
                 {view === 'week' && (
