@@ -1,48 +1,58 @@
-
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/Button";
+import { useState, useEffect, useRef } from "react";
 import { Input, Label } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { Clock, DollarSign, Plus, Trash2, Edit2, Loader2 } from "lucide-react";
+import { Clock, DollarSign, Plus, Trash2, Edit2, Loader2, Check, X, Briefcase } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
-import { collection, addDoc, getDocs, deleteDoc, doc, query } from "firebase/firestore";
+import {
+    collection, addDoc, getDocs, deleteDoc,
+    doc, query, updateDoc
+} from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { sanitizeText, sanitizeHTML, detectXSS } from "@/lib/sanitize";
+import { PROFESSIONAL_CATEGORIES } from "@/lib/categories";
 
 interface Service {
     id: string;
     name: string;
     description: string;
-    duration: number; // in minutes
+    duration: number;
     price: number;
 }
+
+const SELECT_CLASS =
+    "flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+
+const ALL_SUBCATEGORIES = PROFESSIONAL_CATEGORIES.flatMap(cat =>
+    (cat.subcategories || []).map(sub => ({ sub, catName: cat.name }))
+);
+
+const EMPTY_FORM = { name: "", description: "", duration: "50", price: "" };
 
 export default function ServicesPage() {
     const [user, setUser] = useState<User | null>(null);
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isCreating, setIsCreating] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // Form State
-    const [formData, setFormData] = useState({
-        name: "",
-        description: "",
-        duration: "50",
-        price: "",
-    });
+    // Nuevo servicio
+    const [showNew, setShowNew] = useState(false);
+    const [newForm, setNewForm] = useState(EMPTY_FORM);
 
-    // Auth Listener
+    // Edición inline
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState(EMPTY_FORM);
+    const [savingId, setSavingId] = useState<string | null>(null);
+
+    const newFormRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
-            if (currentUser) {
-                fetchServices(currentUser.uid);
-            } else {
-                setLoading(false);
-            }
+            if (currentUser) fetchServices(currentUser.uid);
+            else setLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -50,194 +60,374 @@ export default function ServicesPage() {
     const fetchServices = async (uid: string) => {
         try {
             const q = query(collection(db, "professionals", uid, "services"));
-            const querySnapshot = await getDocs(q);
-            const fetchedServices: Service[] = [];
-            querySnapshot.forEach((doc) => {
-                fetchedServices.push({ id: doc.id, ...doc.data() } as Service);
-            });
-            setServices(fetchedServices);
-        } catch (error) {
-            console.error("Error fetching services:", error);
+            const snap = await getDocs(q);
+            setServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Service)));
+        } catch (e) {
+            console.error(e);
         } finally {
             setLoading(false);
         }
     };
 
+    // ── Crear ──────────────────────────────────────────────────────────────────
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
-
-        // ✅ SEGURIDAD: Detectar XSS
-        if (detectXSS(formData.name) || detectXSS(formData.description)) {
-            alert("⚠️ Se detectó contenido sospechoso. Evitá usar caracteres especiales como <script>, javascript:, etc.");
+        if (detectXSS(newForm.name) || detectXSS(newForm.description)) {
+            alert("⚠️ Contenido sospechoso detectado.");
             return;
         }
-
         setSubmitting(true);
         try {
-            // ✅ SEGURIDAD: Sanitizar campos
-            const sanitizedName = sanitizeText(formData.name);
-            const sanitizedDescription = sanitizeHTML(formData.description);
-
-            const newServiceData = {
-                name: sanitizedName,
-                description: sanitizedDescription,
-                duration: parseInt(formData.duration),
-                price: parseFloat(formData.price),
+            const data = {
+                name: sanitizeText(newForm.name),
+                description: sanitizeHTML(newForm.description),
+                duration: parseInt(newForm.duration) || 50,
+                price: parseFloat(newForm.price) || 0,
             };
-
-            const docRef = await addDoc(collection(db, "professionals", user.uid, "services"), newServiceData);
-
-            setServices([...services, { id: docRef.id, ...newServiceData }]);
-            setIsCreating(false);
-            setFormData({ name: "", description: "", duration: "50", price: "" });
-        } catch (error) {
-            console.error("Error adding service:", error);
+            const ref = await addDoc(collection(db, "professionals", user.uid, "services"), data);
+            setServices(prev => [...prev, { id: ref.id, ...data }]);
+            setNewForm(EMPTY_FORM);
+            setShowNew(false);
+        } catch (e) {
+            console.error(e);
         } finally {
             setSubmitting(false);
         }
     };
 
+    // ── Editar ─────────────────────────────────────────────────────────────────
+    const startEdit = (service: Service) => {
+        setEditingId(service.id);
+        setEditForm({
+            name: service.name,
+            description: service.description,
+            duration: service.duration.toString(),
+            price: service.price.toString(),
+        });
+    };
+
+    const cancelEdit = () => {
+        setEditingId(null);
+        setEditForm(EMPTY_FORM);
+    };
+
+    const handleSaveEdit = async (id: string) => {
+        if (!user) return;
+        if (detectXSS(editForm.name) || detectXSS(editForm.description)) {
+            alert("⚠️ Contenido sospechoso detectado.");
+            return;
+        }
+        setSavingId(id);
+        try {
+            const data = {
+                name: sanitizeText(editForm.name),
+                description: sanitizeHTML(editForm.description),
+                duration: parseInt(editForm.duration) || 50,
+                price: parseFloat(editForm.price) || 0,
+            };
+            await updateDoc(doc(db, "professionals", user.uid, "services", id), data);
+            setServices(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+            setEditingId(null);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setSavingId(null);
+        }
+    };
+
+    // ── Eliminar ───────────────────────────────────────────────────────────────
     const handleDelete = async (id: string) => {
         if (!user) return;
-        if (!confirm("¿Estás seguro de que querés eliminar este servicio?")) return;
-
+        if (!confirm("¿Eliminar este servicio?")) return;
         try {
             await deleteDoc(doc(db, "professionals", user.uid, "services", id));
-            setServices(services.filter(s => s.id !== id));
-        } catch (error) {
-            console.error("Error deleting service:", error);
+            setServices(prev => prev.filter(s => s.id !== id));
+        } catch (e) {
+            console.error(e);
         }
     };
 
     if (loading) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+        return (
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-3xl mx-auto space-y-6 pb-12">
+
+            {/* Header */}
+            <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-secondary">Mis Servicios</h1>
-                    <p className="text-text-secondary">Administrá los tipos de consulta que ofrecés a tus pacientes.</p>
+                    <p className="text-text-secondary text-sm mt-0.5">
+                        Administrá los tipos de consulta que ofrecés a tus pacientes.
+                    </p>
                 </div>
-                <Button onClick={() => setIsCreating(true)} className={isCreating ? "hidden" : ""}>
-                    <Plus className="mr-2 h-4 w-4" /> Nuevo Servicio
-                </Button>
+                {!showNew && (
+                    <button
+                        onClick={() => { setShowNew(true); setTimeout(() => newFormRef.current?.scrollIntoView({ behavior: 'smooth' }), 50); }}
+                        className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl font-semibold text-sm hover:bg-primary-dark transition-colors shadow-sm"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Nuevo Servicio
+                    </button>
+                )}
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-8">
-
-                {/* Services List */}
-                <div className="lg:col-span-2 space-y-4">
-                    {services.map((service) => (
-                        <div key={service.id} className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 hover:border-primary/30 transition-all">
-                            <div className="flex justify-between items-start">
-                                <div className="space-y-1">
-                                    <h3 className="font-bold text-lg text-secondary">{service.name}</h3>
-                                    <p className="text-text-secondary text-sm max-w-md">{service.description}</p>
-                                </div>
-                                <div className="text-right">
-                                    <span className="block font-bold text-xl text-primary">${service.price}</span>
-                                    <div className="flex items-center justify-end text-xs text-text-muted mt-1 gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        {service.duration} min
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex gap-2 mt-4 justify-end">
-                                <Button variant="ghost" size="sm" className="h-8 text-neutral-400 hover:text-secondary">
-                                    <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleDelete(service.id)} className="h-8 text-neutral-400 hover:text-red-500">
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    ))}
-
-                    {services.length === 0 && (
-                        <div className="text-center py-12 bg-white rounded-xl border border-dashed border-neutral-200">
-                            <p className="text-text-muted">No tenés servicios creados aún.</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Create/Edit Form Panel */}
-                {isCreating && (
-                    <div className="lg:col-span-1">
-                        <div className="bg-white p-6 rounded-xl shadow-md border border-neutral-100 sticky top-4">
-                            <h3 className="font-bold text-secondary mb-4">Nuevo Servicio</h3>
-                            <form onSubmit={handleCreate} className="space-y-4">
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Nombre del servicio</Label>
-                                    <Input
-                                        id="name"
-                                        placeholder="Ej: Consulta Individual"
-                                        required
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">Descripción</Label>
-                                    <Textarea
-                                        id="description"
-                                        placeholder="¿Qué incluye este servicio?"
-                                        className="resize-none"
-                                        rows={3}
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="duration">Duración (min)</Label>
-                                        <div className="relative">
-                                            <Clock className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
-                                            <Input
-                                                id="duration"
-                                                type="number"
-                                                className="pl-9"
-                                                placeholder="50"
-                                                required
-                                                value={formData.duration}
-                                                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="price">Precio ($)</Label>
-                                        <div className="relative">
-                                            <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
-                                            <Input
-                                                id="price"
-                                                type="number"
-                                                className="pl-9"
-                                                placeholder="0.00"
-                                                required
-                                                value={formData.price}
-                                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 flex gap-2">
-                                    <Button type="submit" className="w-full" disabled={submitting}>
-                                        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={() => setIsCreating(false)} className="w-full">Cancelar</Button>
-                                </div>
-
-                            </form>
-                        </div>
+            {/* Lista de servicios */}
+            <div className="space-y-3">
+                {services.length === 0 && !showNew && (
+                    <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-neutral-200">
+                        <Briefcase className="h-10 w-10 mx-auto mb-3 text-neutral-300" />
+                        <p className="font-semibold text-text-secondary">Todavía no tenés servicios</p>
+                        <p className="text-sm text-text-muted mt-1">Hacé click en "Nuevo Servicio" para agregar el primero.</p>
                     </div>
                 )}
 
+                {services.map((service) => (
+                    <div
+                        key={service.id}
+                        className={`bg-white rounded-2xl border transition-all duration-200 overflow-hidden
+                            ${editingId === service.id
+                                ? 'border-primary/40 shadow-md'
+                                : 'border-neutral-100 hover:border-neutral-200 shadow-sm'
+                            }`}
+                    >
+                        {editingId === service.id ? (
+                            /* ── Modo edición inline ── */
+                            <div className="p-5 space-y-4">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-bold text-primary uppercase tracking-wide">Editando servicio</span>
+                                    <button onClick={cancelEdit} className="text-neutral-400 hover:text-neutral-600 transition-colors">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+
+                                {/* Nombre */}
+                                <div className="space-y-1.5">
+                                    <Label htmlFor={`edit-name-${service.id}`} className="text-xs">Servicio</Label>
+                                    <select
+                                        id={`edit-name-${service.id}`}
+                                        value={editForm.name}
+                                        onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                                        className={SELECT_CLASS}
+                                    >
+                                        <option value="">Seleccionar servicio...</option>
+                                        {ALL_SUBCATEGORIES.map(({ sub, catName }) => (
+                                            <option key={sub} value={sub}>{catName} — {sub}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Descripción */}
+                                <div className="space-y-1.5">
+                                    <Label htmlFor={`edit-desc-${service.id}`} className="text-xs">Descripción</Label>
+                                    <Textarea
+                                        id={`edit-desc-${service.id}`}
+                                        value={editForm.description}
+                                        onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                                        placeholder="¿Qué incluye este servicio?"
+                                        className="resize-none text-sm"
+                                        rows={2}
+                                    />
+                                </div>
+
+                                {/* Duración + Precio */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor={`edit-dur-${service.id}`} className="text-xs">Duración (min)</Label>
+                                        <div className="relative">
+                                            <Clock className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+                                            <Input
+                                                id={`edit-dur-${service.id}`}
+                                                type="number" min={1}
+                                                value={editForm.duration}
+                                                onChange={e => setEditForm(f => ({ ...f, duration: e.target.value }))}
+                                                className="pl-9"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor={`edit-price-${service.id}`} className="text-xs">Precio ($)</Label>
+                                        <div className="relative">
+                                            <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+                                            <Input
+                                                id={`edit-price-${service.id}`}
+                                                type="number" min={0}
+                                                value={editForm.price}
+                                                onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))}
+                                                className="pl-9"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Acciones */}
+                                <div className="flex gap-2 pt-1">
+                                    <button
+                                        onClick={() => handleSaveEdit(service.id)}
+                                        disabled={savingId === service.id}
+                                        className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-2 rounded-xl text-sm font-semibold hover:bg-primary-dark transition-colors disabled:opacity-60"
+                                    >
+                                        {savingId === service.id
+                                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                                            : <><Check className="h-4 w-4" /> Guardar cambios</>
+                                        }
+                                    </button>
+                                    <button
+                                        onClick={cancelEdit}
+                                        className="px-4 py-2 rounded-xl text-sm font-semibold border border-neutral-200 text-text-secondary hover:bg-neutral-50 transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* ── Vista normal ── */
+                            <div className="flex items-center gap-4 px-5 py-4">
+                                {/* Ícono */}
+                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                    <Briefcase className="h-5 w-5 text-primary" />
+                                </div>
+
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-secondary truncate">{service.name}</p>
+                                    {service.description && (
+                                        <p className="text-xs text-text-muted mt-0.5 line-clamp-1">{service.description}</p>
+                                    )}
+                                    <div className="flex items-center gap-3 mt-1.5">
+                                        <span className="flex items-center gap-1 text-xs text-text-muted">
+                                            <Clock className="h-3 w-3" />
+                                            {service.duration} min
+                                        </span>
+                                        <span className="font-bold text-primary text-sm">
+                                            ${service.price.toLocaleString('es-AR')}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Acciones */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={() => startEdit(service)}
+                                        title="Editar"
+                                        className="p-2 rounded-lg text-neutral-400 hover:text-primary hover:bg-primary/5 transition-colors"
+                                    >
+                                        <Edit2 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(service.id)}
+                                        title="Eliminar"
+                                        className="p-2 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+
+                {/* ── Formulario nuevo servicio (al final de la lista) ── */}
+                {showNew && (
+                    <div ref={newFormRef} className="bg-white rounded-2xl border border-primary/40 shadow-md overflow-hidden">
+                        <div className="bg-primary/5 px-5 py-3 border-b border-primary/10 flex items-center justify-between">
+                            <span className="text-sm font-bold text-primary">Nuevo Servicio</span>
+                            <button onClick={() => { setShowNew(false); setNewForm(EMPTY_FORM); }} className="text-neutral-400 hover:text-neutral-600 transition-colors">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleCreate} className="p-5 space-y-4">
+
+                            {/* Nombre */}
+                            <div className="space-y-1.5">
+                                <Label htmlFor="new-name" className="text-xs">Servicio</Label>
+                                <select
+                                    id="new-name"
+                                    value={newForm.name}
+                                    onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
+                                    className={SELECT_CLASS}
+                                    required
+                                >
+                                    <option value="">Seleccionar servicio...</option>
+                                    {ALL_SUBCATEGORIES.map(({ sub, catName }) => (
+                                        <option key={sub} value={sub}>{catName} — {sub}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Descripción */}
+                            <div className="space-y-1.5">
+                                <Label htmlFor="new-desc" className="text-xs">Descripción</Label>
+                                <Textarea
+                                    id="new-desc"
+                                    value={newForm.description}
+                                    onChange={e => setNewForm(f => ({ ...f, description: e.target.value }))}
+                                    placeholder="¿Qué incluye este servicio?"
+                                    className="resize-none text-sm"
+                                    rows={2}
+                                />
+                            </div>
+
+                            {/* Duración + Precio */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="new-dur" className="text-xs">Duración (min)</Label>
+                                    <div className="relative">
+                                        <Clock className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+                                        <Input
+                                            id="new-dur"
+                                            type="number" min={1}
+                                            value={newForm.duration}
+                                            onChange={e => setNewForm(f => ({ ...f, duration: e.target.value }))}
+                                            className="pl-9"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="new-price" className="text-xs">Precio ($)</Label>
+                                    <div className="relative">
+                                        <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+                                        <Input
+                                            id="new-price"
+                                            type="number" min={0}
+                                            value={newForm.price}
+                                            onChange={e => setNewForm(f => ({ ...f, price: e.target.value }))}
+                                            className="pl-9"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-1">
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-2 rounded-xl text-sm font-semibold hover:bg-primary-dark transition-colors disabled:opacity-60"
+                                >
+                                    {submitting
+                                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                                        : <><Check className="h-4 w-4" /> Guardar Servicio</>
+                                    }
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowNew(false); setNewForm(EMPTY_FORM); }}
+                                    className="px-4 py-2 rounded-xl text-sm font-semibold border border-neutral-200 text-text-secondary hover:bg-neutral-50 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                )}
             </div>
         </div>
     );
