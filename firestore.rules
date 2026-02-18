@@ -65,14 +65,14 @@ service cloud.firestore {
     
     // Appointments collection
     match /appointments/{appointmentId} {
-      allow read: if isAuthenticated() && (
-        resource.data.patientId == request.auth.uid ||
-        resource.data.professionalId == request.auth.uid ||
-        isAdmin()
-      );
+      // Cualquier usuario autenticado puede leer appointments para verificar
+      // disponibilidad en el flujo de reserva (qué horarios están ocupados).
+      // La escritura/modificación sigue restringida al dueño o profesional.
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (
         resource.data.patientId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
         resource.data.professionalId == request.auth.uid ||
         isAdmin()
       );
