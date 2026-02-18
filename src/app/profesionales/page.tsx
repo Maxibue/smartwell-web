@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Navbar } from "@/components/layout/Navbar";
 import { Search, MapPin, Star, Filter } from "lucide-react";
 import Link from "next/link";
+import { ProfessionalAvatar } from "@/components/ui/ProfessionalAvatar";
 
 // Firebase Imports
 import { db } from "@/lib/firebase";
@@ -68,7 +69,7 @@ export default function SearchPage() {
                             rating: data.rating || 5.0,
                             reviews: data.reviews || 0,
                             price: data.price || 0,
-                            image: data.image || data.profileImage || `https://ui-avatars.com/api/?name=${data.name}&background=random`,
+                            image: data.image || data.profileImage || null,
                             tags: data.tags || [],
                             nextAvailable: "Consultar",
                             status: status
@@ -239,7 +240,7 @@ export default function SearchPage() {
                                 <div className="bg-white rounded-xl overflow-hidden border border-neutral-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
                                     <div className="p-6">
                                         <div className="flex items-start gap-4">
-                                            <img src={pro.image} alt={pro.name} className="w-16 h-16 rounded-full object-cover ring-2 ring-neutral-100" />
+                                            <ProfessionalAvatar name={pro.name} imageUrl={pro.image} size="lg" className="ring-2 ring-neutral-100" />
                                             <div>
                                                 <h3 className="font-bold text-lg text-secondary group-hover:text-primary transition-colors">{pro.name}</h3>
                                                 <p className="text-primary font-medium text-sm">{pro.specialty}</p>

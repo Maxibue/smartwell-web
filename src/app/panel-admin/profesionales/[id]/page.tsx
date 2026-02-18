@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
+import { ProfessionalAvatar } from "@/components/ui/ProfessionalAvatar";
 
 interface ProfessionalDetail {
     id: string;
@@ -180,17 +181,11 @@ export default function ProfessionalDetailPage() {
                 <div className="flex flex-col md:flex-row gap-8">
                     {/* Profile Image */}
                     <div className="flex-shrink-0">
-                        {professional.image ? (
-                            <img
-                                src={professional.image}
-                                alt={professional.name}
-                                className="w-32 h-32 rounded-full object-cover border-4 border-primary/20"
-                            />
-                        ) : (
-                            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-white text-4xl font-bold">
-                                {professional.name.charAt(0).toUpperCase()}
-                            </div>
-                        )}
+                        <ProfessionalAvatar
+                            name={professional.name}
+                            imageUrl={professional.image}
+                            size="xl"
+                        />
                     </div>
 
                     {/* Info */}

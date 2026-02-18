@@ -10,6 +10,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { PROFESSIONAL_CATEGORIES, getCategoryName, getSubcategories } from "@/lib/categories";
 import { sanitizeText, sanitizeHTML, sanitizePhone, sanitizeURL, detectXSS } from "@/lib/sanitize";
+import { ProfessionalAvatar } from "@/components/ui/ProfessionalAvatar";
 
 interface ProfessionalProfile {
     uid: string;
@@ -292,13 +293,11 @@ export default function ProfilePage() {
                 <div className="md:col-span-1 space-y-6">
                     {/* Profile Image */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex flex-col items-center text-center">
-                        <div
-                            className="relative mb-4"
-                        >
-                            <img
-                                src={profile.image || `https://ui-avatars.com/api/?name=${profile.name}&background=random`}
-                                alt="Profile"
-                                className={`w-36 h-36 rounded-full object-cover border-4 border-white shadow-md transition-opacity`}
+                        <div className="relative mb-4">
+                            <ProfessionalAvatar
+                                name={profile.name}
+                                imageUrl={profile.image}
+                                size="xl"
                             />
                         </div>
 

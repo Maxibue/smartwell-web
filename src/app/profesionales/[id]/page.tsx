@@ -12,6 +12,7 @@ import Link from "next/link";
 import { ReviewList } from "@/components/ReviewList";
 import { ReviewStatsDisplay } from "@/components/ReviewStatsDisplay";
 import { getProfessionalReviews, getReviewStats, Review, ReviewStats } from "@/lib/reviews";
+import { ProfessionalAvatar } from "@/components/ui/ProfessionalAvatar";
 
 interface Service {
     id: string;
@@ -235,19 +236,11 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
                             {/* Profile Header */}
                             <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-8">
                                 <div className="flex items-start gap-6">
-                                    {professional.profileImage ? (
-                                        <img
-                                            src={professional.profileImage}
-                                            alt={`${professional.firstName} ${professional.lastName}`}
-                                            className="w-24 h-24 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
-                                            <span className="text-3xl font-bold text-primary">
-                                                {professional.firstName[0]}{professional.lastName[0]}
-                                            </span>
-                                        </div>
-                                    )}
+                                    <ProfessionalAvatar
+                                        name={`${professional.firstName} ${professional.lastName}`}
+                                        imageUrl={professional.profileImage}
+                                        size="xl"
+                                    />
 
                                     <div className="flex-1">
                                         <h1 className="text-3xl font-bold text-secondary mb-2">
@@ -341,8 +334,8 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
                                                         selectedService?.id === service.id ? null : service
                                                     )}
                                                     className={`w-full text-left p-3 rounded-xl border-2 transition-all ${selectedService?.id === service.id
-                                                            ? 'border-primary bg-primary/5 shadow-sm'
-                                                            : 'border-neutral-100 hover:border-primary/40 hover:bg-neutral-50'
+                                                        ? 'border-primary bg-primary/5 shadow-sm'
+                                                        : 'border-neutral-100 hover:border-primary/40 hover:bg-neutral-50'
                                                         }`}
                                                 >
                                                     <div className="flex items-start justify-between gap-2">

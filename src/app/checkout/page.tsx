@@ -12,6 +12,7 @@ import { Loader2, Calendar, Clock, CreditCard, ShieldCheck } from "lucide-react"
 import { format, parse } from "date-fns";
 import { es } from "date-fns/locale";
 import { MOCK_PROFESSIONALS } from "@/lib/mock-data";
+import { ProfessionalAvatar } from "@/components/ui/ProfessionalAvatar";
 
 export default function CheckoutPage() {
     const searchParams = useSearchParams();
@@ -225,10 +226,10 @@ export default function CheckoutPage() {
                             <h3 className="font-bold text-secondary text-lg mb-4">Resumen</h3>
 
                             <div className="flex items-center gap-4 mb-6 pb-6 border-b border-neutral-100">
-                                <img
-                                    src={professional.image || "https://i.pravatar.cc/150"}
-                                    className="w-12 h-12 rounded-full object-cover"
-                                    alt={professional.name}
+                                <ProfessionalAvatar
+                                    name={professional.name || professional.fullName || 'Profesional'}
+                                    imageUrl={professional.image}
+                                    size="md"
                                 />
                                 <div>
                                     <p className="font-semibold text-secondary">{professional.name}</p>
