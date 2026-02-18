@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 
 const sidebarItems = [
     { icon: Calendar, label: "Mis Turnos", href: "/panel-usuario/turnos" },
+    { icon: UserIcon, label: "Mis Datos", href: "/panel-usuario/perfil" },
     // { icon: Clock, label: "Historial", href: "/panel-usuario/historial" }, // Future
 ];
 
@@ -89,7 +90,7 @@ export default function UserLayout({
                         </div>
                         <div>
                             <Link href="/" className="font-bold font-display text-secondary">SmartWell</Link>
-                            <p className="text-xs text-text-muted">Panel Paciente</p>
+                            <p className="text-xs text-text-muted">Mi Panel</p>
                         </div>
                     </div>
                     {/* Mobile Menu Button could go here */}
@@ -136,7 +137,7 @@ export default function UserLayout({
                 {/* Desktop Header */}
                 <header className="hidden md:flex bg-white border-b border-neutral-200 p-4 items-center justify-between sticky top-0 z-40">
                     <div>
-                        <h1 className="text-xl font-bold text-secondary">Panel de Paciente</h1>
+                        <h1 className="text-xl font-bold text-secondary">Mi Panel</h1>
                         <p className="text-sm text-text-muted">Bienvenido{user?.displayName ? `, ${user.displayName}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-4">
