@@ -129,21 +129,39 @@ export default function CalendarPage() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
-            if (currentUser) {
-                fetchAppointments(currentUser.uid);
-                // Cargar disponibilidad del profesional
-                try {
-                    const profDoc = await getDoc(doc(db, 'professionals', currentUser.uid));
-                    if (profDoc.exists() && profDoc.data().availability) {
-                        setAvailability(profDoc.data().availability as WeekAvailability);
-                    }
-                } catch (e) { console.warn('availability:', e); }
-            } else {
-                setLoading(false);
-            }
+            if (!currentUser) setLoading(false);
         });
         return () => unsubscribe();
     }, []);
+
+    // Cargar disponibilidad cuando el usuario está disponible
+    // y también cuando el usuario vuelve a la página (visibilitychange)
+    useEffect(() => {
+        if (!user) return;
+
+        const loadAvailability = async () => {
+            try {
+                const profDoc = await getDoc(doc(db, 'professionals', user.uid));
+                if (profDoc.exists() && profDoc.data().availability) {
+                    setAvailability(profDoc.data().availability as WeekAvailability);
+                } else {
+                    setAvailability(null);
+                }
+            } catch (e) { console.warn('availability:', e); }
+        };
+
+        loadAvailability();
+        fetchAppointments(user.uid);
+
+        // Recargar cuando el usuario vuelve a esta pestaña
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                loadAvailability();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => document.removeEventListener('visibilitychange', handleVisibility);
+    }, [user]);
 
     // Re-fetch cuando cambia la vista o el período
     useEffect(() => {

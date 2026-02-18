@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/Button";
@@ -60,6 +60,7 @@ const DEFAULT_AVAILABILITY: WeekAvailability = {
 export default function DisponibilidadPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
     const [availability, setAvailability] = useState<WeekAvailability>(DEFAULT_AVAILABILITY);
     const [sessionDuration, setSessionDuration] = useState(50);
     const [bufferTime, setBufferTime] = useState(10);
@@ -147,19 +148,33 @@ export default function DisponibilidadPage() {
     const handleSave = async () => {
         if (!professionalId) return;
 
+        // Validar que todos los slots tengan start < end
+        for (const day of ORDERED_DAYS) {
+            if (!availability[day].enabled) continue;
+            for (const slot of availability[day].slots) {
+                if (slot.start >= slot.end) {
+                    alert(`⚠️ El horario de ${DAYS_ES[day]} tiene un rango inválido: ${slot.start} - ${slot.end}. El inicio debe ser antes del fin.`);
+                    return;
+                }
+            }
+        }
+
         setSaving(true);
+        setSaveSuccess(false);
         try {
-            await updateDoc(doc(db, "professionals", professionalId), {
+            // Usar setDoc con merge:true para que funcione aunque el doc no exista
+            await setDoc(doc(db, "professionals", professionalId), {
                 availability,
                 sessionDuration,
                 bufferTime,
                 updatedAt: new Date(),
-            });
+            }, { merge: true });
 
-            alert("✅ Disponibilidad guardada correctamente");
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
         } catch (error) {
             console.error("Error saving availability:", error);
-            alert("❌ Error al guardar la disponibilidad");
+            alert("❌ Error al guardar la disponibilidad. Verificá tu conexión.");
         } finally {
             setSaving(false);
         }
@@ -320,7 +335,15 @@ export default function DisponibilidadPage() {
             </div>
 
             {/* Save Button */}
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-4">
+                {saveSuccess && (
+                    <span className="flex items-center gap-2 text-green-600 font-medium text-sm animate-pulse">
+                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        ¡Disponibilidad guardada!
+                    </span>
+                )}
                 <Button onClick={handleSave} disabled={saving} size="lg">
                     {saving ? (
                         <>
