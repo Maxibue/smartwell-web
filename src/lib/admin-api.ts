@@ -52,6 +52,39 @@ export async function callProtectedAPI(
 }
 
 /**
+ * Helper genérico para actualizar el estado de un profesional
+ */
+export async function updateProfessionalStatus(
+    user: User,
+    professionalId: string,
+    status: 'pending' | 'under_review' | 'approved' | 'rejected'
+) {
+    const response = await callProtectedAPI(
+        user,
+        `/api/admin/professionals/${professionalId}/status`,
+        { method: 'POST', body: { status } }
+    );
+
+    const responseClone = response.clone();
+    const responseText = await responseClone.text();
+
+    if (!response.ok) {
+        try {
+            const error = JSON.parse(responseText);
+            throw new Error(error.error || 'Error al actualizar estado');
+        } catch {
+            throw new Error(`Error al actualizar estado (${response.status}): ${responseText}`);
+        }
+    }
+
+    if (!responseText || responseText.trim() === '') {
+        throw new Error('El servidor retornó una respuesta vacía');
+    }
+
+    return JSON.parse(responseText);
+}
+
+/**
  * Helper específico para aprobar profesional
  */
 export async function approveProfessional(user: User, professionalId: string) {

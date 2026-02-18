@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { approveProfessional, rejectProfessional } from "@/lib/admin-api";
-import { Search, Filter, CheckCircle, XCircle, Eye, Loader2, Clock, UserCheck } from "lucide-react";
+import { updateProfessionalStatus } from "@/lib/admin-api";
+import { Search, Eye, Loader2, ChevronDown, Check } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
+
+type ProfessionalStatus = "pending" | "under_review" | "approved" | "rejected";
 
 interface Professional {
     id: string;
@@ -16,9 +17,101 @@ interface Professional {
     title: string;
     specialty: string;
     category: string;
-    status: "pending" | "under_review" | "approved" | "rejected";
+    status: ProfessionalStatus;
     createdAt: Date;
     reviewRequestedAt?: Date;
+}
+
+const STATUS_CONFIG: Record<ProfessionalStatus, { label: string; color: string; bg: string; dot: string }> = {
+    pending: { label: "Pendiente", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", dot: "bg-amber-400" },
+    under_review: { label: "En Revisión", color: "text-blue-700", bg: "bg-blue-50 border-blue-200", dot: "bg-blue-400" },
+    approved: { label: "Aprobado", color: "text-green-700", bg: "bg-green-50 border-green-200", dot: "bg-green-500" },
+    rejected: { label: "Rechazado", color: "text-red-700", bg: "bg-red-50 border-red-200", dot: "bg-red-500" },
+};
+
+const ALL_STATUSES: ProfessionalStatus[] = ["pending", "under_review", "approved", "rejected"];
+
+// Dropdown de cambio de estado inline
+function StatusDropdown({
+    professionalId,
+    currentStatus,
+    currentUser,
+    onStatusChanged,
+}: {
+    professionalId: string;
+    currentStatus: ProfessionalStatus;
+    currentUser: FirebaseUser;
+    onStatusChanged: (newStatus: ProfessionalStatus) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    // Cerrar al hacer click fuera
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const handleSelect = async (newStatus: ProfessionalStatus) => {
+        if (newStatus === currentStatus) { setOpen(false); return; }
+        setOpen(false);
+        setLoading(true);
+        try {
+            await updateProfessionalStatus(currentUser, professionalId, newStatus);
+            onStatusChanged(newStatus);
+        } catch (error: any) {
+            alert(error.message || "Error al actualizar el estado.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const cfg = STATUS_CONFIG[currentStatus];
+
+    return (
+        <div ref={ref} className="relative inline-block">
+            <button
+                onClick={() => setOpen((v) => !v)}
+                disabled={loading}
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all ${cfg.bg} ${cfg.color} hover:opacity-80 disabled:opacity-50 cursor-pointer select-none`}
+            >
+                {loading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                    <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
+                )}
+                {cfg.label}
+                <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+
+            {open && (
+                <div className="absolute z-50 mt-1 left-0 w-44 bg-white rounded-xl shadow-lg border border-neutral-200 py-1 overflow-hidden">
+                    {ALL_STATUSES.map((s) => {
+                        const c = STATUS_CONFIG[s];
+                        return (
+                            <button
+                                key={s}
+                                onClick={() => handleSelect(s)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-neutral-50 transition-colors text-left"
+                            >
+                                <span className={`h-2 w-2 rounded-full flex-shrink-0 ${c.dot}`} />
+                                <span className={`font-medium ${c.color}`}>{c.label}</span>
+                                {s === currentStatus && (
+                                    <Check className="h-3 w-3 ml-auto text-neutral-400" />
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default function ProfessionalesPage() {
@@ -43,27 +136,24 @@ export default function ProfessionalesPage() {
 
     const fetchProfessionals = async () => {
         try {
-            const professionalsSnap = await getDocs(
+            const snap = await getDocs(
                 query(collection(db, "professionals"), orderBy("createdAt", "desc"))
             );
-
-            const profsData: Professional[] = [];
-            professionalsSnap.forEach((doc) => {
-                const data = doc.data();
-                profsData.push({
+            const data: Professional[] = snap.docs.map((doc) => {
+                const d = doc.data();
+                return {
                     id: doc.id,
-                    name: data.name || "Sin nombre",
-                    email: data.email || "",
-                    title: data.title || "Sin título",
-                    specialty: data.specialty || "Sin especialidad",
-                    category: data.category || "Sin categoría",
-                    status: data.status || "pending",
-                    createdAt: data.createdAt?.toDate() || new Date(),
-                    reviewRequestedAt: data.reviewRequestedAt?.toDate(),
-                });
+                    name: d.name || "Sin nombre",
+                    email: d.email || "",
+                    title: d.title || "Sin título",
+                    specialty: d.specialty || "Sin especialidad",
+                    category: d.category || "Sin categoría",
+                    status: d.status || "pending",
+                    createdAt: d.createdAt?.toDate() || new Date(),
+                    reviewRequestedAt: d.reviewRequestedAt?.toDate(),
+                };
             });
-
-            setProfessionals(profsData);
+            setProfessionals(data);
         } catch (error) {
             console.error("Error fetching professionals:", error);
         } finally {
@@ -73,81 +163,25 @@ export default function ProfessionalesPage() {
 
     const filterProfessionals = () => {
         let filtered = professionals;
-
-        // Filtrar por búsqueda
         if (searchTerm) {
+            const term = searchTerm.toLowerCase();
             filtered = filtered.filter(
-                (prof) =>
-                    prof.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    prof.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    prof.specialty.toLowerCase().includes(searchTerm.toLowerCase())
+                (p) =>
+                    p.name.toLowerCase().includes(term) ||
+                    p.email.toLowerCase().includes(term) ||
+                    p.specialty.toLowerCase().includes(term)
             );
         }
-
-        // Filtrar por estado
         if (statusFilter !== "all") {
-            filtered = filtered.filter((prof) => prof.status === statusFilter);
+            filtered = filtered.filter((p) => p.status === statusFilter);
         }
-
         setFilteredProfessionals(filtered);
     };
 
-    const handleStatusChange = async (professionalId: string, newStatus: "approved" | "rejected") => {
-        console.log('🔵 handleStatusChange called!', { professionalId, newStatus, currentUser: !!currentUser });
-
-        if (!currentUser) {
-            alert("Debes estar autenticado para realizar esta acción.");
-            return;
-        }
-
-        // TEMPORARY: Skip confirmation for debugging
-        // const confirmed = confirm(
-        //     `¿Estás seguro que querés ${newStatus === "approved" ? "aprobar" : "rechazar"} este profesional?`
-        // );
-        // if (!confirmed) return;
-
-        console.log('🟡 Skipping confirm dialog for debugging...');
-
-        // ✅ VALIDAR que el usuario esté autenticado
-        if (!currentUser) {
-            console.error('❌ No hay usuario autenticado');
-            alert('Debes iniciar sesión para realizar esta acción.');
-            return;
-        }
-
-        console.log('✅ Usuario autenticado:', currentUser.email);
-
-        try {
-            console.log('🟢 About to call API...', newStatus);
-            // ✅ SEGURO: Usar API route protegida con audit logging
-            if (newStatus === "approved") {
-                await approveProfessional(currentUser, professionalId);
-            } else {
-                await rejectProfessional(currentUser, professionalId);
-            }
-
-            alert(`Profesional ${newStatus === "approved" ? "aprobado" : "rechazado"} correctamente.`);
-            fetchProfessionals();
-        } catch (error: any) {
-            console.error("❌ Error updating professional status:", error);
-            alert(error.message || "Hubo un error al actualizar el estado.");
-        }
-    };
-
-    const getStatusBadge = (status: string) => {
-        const badges = {
-            pending: { label: "Pendiente", color: "bg-amber-100 text-amber-800" },
-            under_review: { label: "En Revisión", color: "bg-blue-100 text-blue-800" },
-            approved: { label: "Aprobado", color: "bg-green-100 text-green-800" },
-            rejected: { label: "Rechazado", color: "bg-red-100 text-red-800" },
-        };
-
-        const badge = badges[status as keyof typeof badges] || badges.pending;
-
-        return (
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>
-                {badge.label}
-            </span>
+    // Actualiza el estado localmente sin re-fetch
+    const handleStatusChanged = (professionalId: string, newStatus: ProfessionalStatus) => {
+        setProfessionals((prev) =>
+            prev.map((p) => (p.id === professionalId ? { ...p, status: newStatus } : p))
         );
     };
 
@@ -172,45 +206,48 @@ export default function ProfessionalesPage() {
             {/* Header */}
             <div>
                 <h1 className="text-3xl font-bold text-secondary">Gestión de Profesionales</h1>
-                <p className="text-text-secondary mt-1">Aprobar, rechazar y gestionar profesionales</p>
+                <p className="text-text-secondary mt-1">
+                    Gestiona el estado de los profesionales registrados en la plataforma
+                </p>
             </div>
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {[
-                    { label: "Todos", value: stats.all, filter: "all" },
-                    { label: "Pendientes", value: stats.pending, filter: "pending" },
-                    { label: "En Revisión", value: stats.under_review, filter: "under_review" },
-                    { label: "Aprobados", value: stats.approved, filter: "approved" },
-                    { label: "Rechazados", value: stats.rejected, filter: "rejected" },
+                    { label: "Todos", value: stats.all, filter: "all", dot: "bg-neutral-400" },
+                    { label: "Pendientes", value: stats.pending, filter: "pending", dot: "bg-amber-400" },
+                    { label: "En Revisión", value: stats.under_review, filter: "under_review", dot: "bg-blue-400" },
+                    { label: "Aprobados", value: stats.approved, filter: "approved", dot: "bg-green-500" },
+                    { label: "Rechazados", value: stats.rejected, filter: "rejected", dot: "bg-red-500" },
                 ].map((stat) => (
                     <button
                         key={stat.filter}
                         onClick={() => setStatusFilter(stat.filter)}
-                        className={`p-4 rounded-lg border-2 transition-all ${statusFilter === stat.filter
-                            ? "border-primary bg-primary/5"
-                            : "border-neutral-200 hover:border-neutral-300"
+                        className={`p-4 rounded-xl border-2 transition-all text-left ${statusFilter === stat.filter
+                                ? "border-primary bg-primary/5"
+                                : "border-neutral-200 hover:border-neutral-300 bg-white"
                             }`}
                     >
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className={`h-2 w-2 rounded-full ${stat.dot}`} />
+                            <p className="text-xs text-text-secondary">{stat.label}</p>
+                        </div>
                         <p className="text-2xl font-bold text-secondary">{stat.value}</p>
-                        <p className="text-sm text-text-secondary">{stat.label}</p>
                     </button>
                 ))}
             </div>
 
-            {/* Search and Filters */}
+            {/* Search */}
             <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-4">
-                <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-3 h-5 w-5 text-neutral-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre, email o especialidad..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                        />
-                    </div>
+                <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-5 w-5 text-neutral-400" />
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre, email o especialidad..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
                 </div>
             </div>
 
@@ -237,7 +274,7 @@ export default function ProfessionalesPage() {
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-neutral-200">
+                        <tbody className="divide-y divide-neutral-100">
                             {filteredProfessionals.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-12 text-center text-text-muted">
@@ -260,19 +297,34 @@ export default function ProfessionalesPage() {
                                                 <p className="text-xs text-text-muted">{prof.category}</p>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">{getStatusBadge(prof.status)}</td>
+                                        <td className="px-6 py-4">
+                                            {currentUser ? (
+                                                <StatusDropdown
+                                                    professionalId={prof.id}
+                                                    currentStatus={prof.status}
+                                                    currentUser={currentUser}
+                                                    onStatusChanged={(newStatus) =>
+                                                        handleStatusChanged(prof.id, newStatus)
+                                                    }
+                                                />
+                                            ) : (
+                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${STATUS_CONFIG[prof.status].bg} ${STATUS_CONFIG[prof.status].color}`}>
+                                                    {STATUS_CONFIG[prof.status].label}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4">
                                             <p className="text-sm text-text-secondary">
-                                                {prof.createdAt.toLocaleDateString()}
+                                                {prof.createdAt.toLocaleDateString("es-AR")}
                                             </p>
                                             {prof.reviewRequestedAt && (
                                                 <p className="text-xs text-text-muted">
-                                                    Solicitó: {prof.reviewRequestedAt.toLocaleDateString()}
+                                                    Solicitó: {prof.reviewRequestedAt.toLocaleDateString("es-AR")}
                                                 </p>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center justify-end gap-2">
+                                            <div className="flex items-center justify-end">
                                                 <Link
                                                     href={`/panel-admin/profesionales/${prof.id}`}
                                                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -280,24 +332,6 @@ export default function ProfessionalesPage() {
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                 </Link>
-                                                {(prof.status === "pending" || prof.status === "under_review") && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleStatusChange(prof.id, "approved")}
-                                                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                            title="Aprobar"
-                                                        >
-                                                            <CheckCircle className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleStatusChange(prof.id, "rejected")}
-                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title="Rechazar"
-                                                        >
-                                                            <XCircle className="h-4 w-4" />
-                                                        </button>
-                                                    </>
-                                                )}
                                             </div>
                                         </td>
                                     </tr>
