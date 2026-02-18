@@ -425,21 +425,40 @@ export default function CalendarPage() {
     /**
      * Devuelve true si el slot (día + hora) está FUERA de la disponibilidad
      * configurada por el profesional.
+     * 
+     * Reglas:
+     *  - Si no hay disponibilidad configurada → false (no pintar nada)
+     *  - Si el día no está habilitado → true (fuera)
+     *  - Si el día está habilitado pero sin slots → false (disponible todo el día)
+     *  - Si hay slots → true solo si la hora no cae en ningún bloque
      */
     const isSlotOutsideAvailability = (day: Date, hour: number): boolean => {
-        if (!availability) return false;
+        if (!availability) return false; // Sin config → no marcar nada
+
         const dayKey = DOW_MAP[day.getDay()] as keyof WeekAvailability;
         const dayAvail = availability[dayKey];
-        if (!dayAvail?.enabled) return true; // día no habilitado → fuera
-        // El slot de 1 hora va de hour:00 a hour:59
+
+        // Día no habilitado → fuera de disponibilidad
+        if (!dayAvail || !dayAvail.enabled) return true;
+
+        // Día habilitado pero sin slots configurados → disponible todo el día
+        if (!dayAvail.slots || dayAvail.slots.length === 0) return false;
+
+        // Verificar si la hora cae dentro de algún bloque
+        // El slot de 1 hora va de hour:00 a hour+1:00
         const slotStart = hour * 60;
         const slotEnd = slotStart + 60;
-        // Está dentro si algún bloque lo cubre
+
         const covered = dayAvail.slots.some(s => {
+            if (!s.start || !s.end) return false; // slot malformado → ignorar
             const blockStart = parseMinutes(s.start);
             const blockEnd = parseMinutes(s.end);
+            if (blockStart >= blockEnd) return false; // rango inválido → ignorar
+            // Hay solapamiento si el slot empieza antes de que termine el bloque
+            // y termina después de que empiece el bloque
             return slotStart < blockEnd && slotEnd > blockStart;
         });
+
         return !covered;
     };
 
@@ -447,8 +466,12 @@ export default function CalendarPage() {
     const isDayUnavailable = (day: Date): boolean => {
         if (!availability) return false;
         const dayKey = DOW_MAP[day.getDay()] as keyof WeekAvailability;
-        return !availability[dayKey]?.enabled;
+        const dayAvail = availability[dayKey];
+        return !dayAvail || !dayAvail.enabled;
     };
+
+    /** Devuelve true si hay disponibilidad configurada */
+    const hasAvailabilityConfigured = availability !== null;
 
     const getCurrentTime = () => {
         const now = new Date();
@@ -565,6 +588,26 @@ export default function CalendarPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Banner: sin disponibilidad configurada */}
+                {!hasAvailabilityConfigured && (
+                    <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-3 text-sm">
+                        <span className="text-amber-600 font-semibold">⚠️ No tenés disponibilidad configurada.</span>
+                        <a href="/panel-profesional/disponibilidad" className="text-primary underline font-medium hover:text-primary-dark">
+                            Configurar disponibilidad →
+                        </a>
+                    </div>
+                )}
+
+                {/* Banner: disponibilidad cargada (debug info) */}
+                {hasAvailabilityConfigured && (
+                    <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-xs text-green-700">
+                        <span>✅ Disponibilidad cargada.</span>
+                        <span className="opacity-70">
+                            Días activos: {Object.entries(availability!).filter(([, v]) => v.enabled).map(([k]) => k).join(', ')}
+                        </span>
+                    </div>
+                )}
 
                 {/* Week View */}
                 {view === 'week' && (
@@ -728,7 +771,7 @@ export default function CalendarPage() {
                                         `}
                                     >
                                         <div className={`text-sm font-semibold mb-1 flex items-center justify-between ${isToday(day) ? 'text-primary' :
-                                                !isCurrentMonth ? 'text-text-muted' : 'text-secondary'
+                                            !isCurrentMonth ? 'text-text-muted' : 'text-secondary'
                                             }`}>
                                             <span>{day.getDate()}</span>
                                             {dayUnavail && isCurrentMonth && (
