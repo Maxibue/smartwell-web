@@ -76,11 +76,20 @@ function initializeAdminApp(): App | null {
 
         // Opción 3: Variables individuales (recomendado para Vercel)
         if (!credential && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+            console.log('🟡 Attempting to use individual environment variables...');
+            console.log('🟡 FIREBASE_CLIENT_EMAIL:', process.env.FIREBASE_CLIENT_EMAIL);
+            console.log('🟡 FIREBASE_PRIVATE_KEY length:', process.env.FIREBASE_PRIVATE_KEY.length);
+
+            // Procesar la private key - Vercel puede escapar de diferentes maneras
+            let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+            // Intentar ambos formatos de escapado
+            privateKey = privateKey.replace(/\n/g, '\n').replace(/\\n/g, '\n');
+
             credential = cert({
                 projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
                 clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                // Vercel escapa los saltos de línea, necesitamos reemplazarlos
-                privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+                privateKey: privateKey,
             });
             console.log('✅ Firebase Admin SDK using individual environment variables');
         }
