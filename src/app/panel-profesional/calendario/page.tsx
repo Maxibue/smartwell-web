@@ -4,13 +4,32 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, X } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
-import { collection, query, where, getDocs, addDoc, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, Timestamp, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const FULL_DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 7); // 7 AM to 9 PM
 const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+// Mapa: getDay() → clave de disponibilidad
+const DOW_MAP: Record<number, string> = {
+    0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday',
+    4: 'thursday', 5: 'friday', 6: 'saturday',
+};
+
+interface TimeSlot { start: string; end: string; }
+interface DayAvailability { enabled: boolean; slots: TimeSlot[]; }
+interface WeekAvailability {
+    monday: DayAvailability; tuesday: DayAvailability; wednesday: DayAvailability;
+    thursday: DayAvailability; friday: DayAvailability;
+    saturday: DayAvailability; sunday: DayAvailability;
+}
+
+function parseMinutes(t: string): number {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+}
 
 interface Appointment {
     id: string;
@@ -33,6 +52,7 @@ export default function CalendarPage() {
     const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [view, setView] = useState<'week' | 'day' | 'month'>('week');
+    const [availability, setAvailability] = useState<WeekAvailability | null>(null);
 
     // Modal states
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -107,10 +127,17 @@ export default function CalendarPage() {
 
     // Auth: solo una vez al montar
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
                 fetchAppointments(currentUser.uid);
+                // Cargar disponibilidad del profesional
+                try {
+                    const profDoc = await getDoc(doc(db, 'professionals', currentUser.uid));
+                    if (profDoc.exists() && profDoc.data().availability) {
+                        setAvailability(profDoc.data().availability as WeekAvailability);
+                    }
+                } catch (e) { console.warn('availability:', e); }
             } else {
                 setLoading(false);
             }
@@ -388,9 +415,39 @@ export default function CalendarPage() {
                 return 'border-yellow-500 bg-yellow-50 text-yellow-700';
             case 'cancelled':
                 return 'border-neutral-300 bg-neutral-100 text-text-muted';
+            case 'completed':
+                return 'border-blue-400 bg-blue-50 text-blue-700';
             default:
                 return 'border-neutral-300 bg-neutral-50 text-text-secondary';
         }
+    };
+
+    /**
+     * Devuelve true si el slot (día + hora) está FUERA de la disponibilidad
+     * configurada por el profesional.
+     */
+    const isSlotOutsideAvailability = (day: Date, hour: number): boolean => {
+        if (!availability) return false;
+        const dayKey = DOW_MAP[day.getDay()] as keyof WeekAvailability;
+        const dayAvail = availability[dayKey];
+        if (!dayAvail?.enabled) return true; // día no habilitado → fuera
+        // El slot de 1 hora va de hour:00 a hour:59
+        const slotStart = hour * 60;
+        const slotEnd = slotStart + 60;
+        // Está dentro si algún bloque lo cubre
+        const covered = dayAvail.slots.some(s => {
+            const blockStart = parseMinutes(s.start);
+            const blockEnd = parseMinutes(s.end);
+            return slotStart < blockEnd && slotEnd > blockStart;
+        });
+        return !covered;
+    };
+
+    /** Devuelve true si el día completo está fuera de disponibilidad */
+    const isDayUnavailable = (day: Date): boolean => {
+        if (!availability) return false;
+        const dayKey = DOW_MAP[day.getDay()] as keyof WeekAvailability;
+        return !availability[dayKey]?.enabled;
     };
 
     const getCurrentTime = () => {
@@ -539,11 +596,17 @@ export default function CalendarPage() {
 
                                     {weekDays.map((day, dayIdx) => {
                                         const appointment = getAppointmentForSlot(day, hour);
+                                        const outsideAvail = isSlotOutsideAvailability(day, hour);
                                         return (
                                             <div
                                                 key={dayIdx}
                                                 onClick={() => handleSlotClick(day, hour)}
-                                                className={`p-2 border-l border-neutral-100 min-h-[80px] cursor-pointer hover:bg-primary/5 transition-colors ${isToday(day) ? 'bg-primary/5' : ''
+                                                className={`p-2 border-l border-neutral-100 min-h-[80px] cursor-pointer transition-colors
+                                                    ${outsideAvail
+                                                        ? 'bg-amber-50/70 hover:bg-amber-100/60'
+                                                        : isToday(day)
+                                                            ? 'bg-primary/5 hover:bg-primary/10'
+                                                            : 'hover:bg-primary/5'
                                                     }`}
                                             >
                                                 {appointment ? (
@@ -554,6 +617,10 @@ export default function CalendarPage() {
                                                             <Clock className="h-3 w-3 opacity-60" />
                                                             <span className="text-xs opacity-75">{appointment.duration}min</span>
                                                         </div>
+                                                    </div>
+                                                ) : outsideAvail ? (
+                                                    <div className="h-full flex items-center justify-center">
+                                                        <span className="text-xs text-amber-400 opacity-60 select-none">—</span>
                                                     </div>
                                                 ) : (
                                                     <div className="h-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
@@ -590,11 +657,16 @@ export default function CalendarPage() {
                         <div className="divide-y divide-neutral-100">
                             {HOURS.map((hour) => {
                                 const appointment = getAppointmentForSlot(currentDay, hour);
+                                const outsideAvail = isSlotOutsideAvailability(currentDay, hour);
                                 return (
                                     <div
                                         key={hour}
                                         onClick={() => handleSlotClick(currentDay, hour)}
-                                        className="p-4 hover:bg-neutral-50 cursor-pointer transition-colors flex items-center gap-4"
+                                        className={`p-4 cursor-pointer transition-colors flex items-center gap-4 border-b border-neutral-100
+                                            ${outsideAvail
+                                                ? 'bg-amber-50/70 hover:bg-amber-100/60'
+                                                : 'hover:bg-neutral-50'
+                                            }`}
                                     >
                                         <div className="w-20 text-sm font-medium text-text-secondary">
                                             {hour.toString().padStart(2, '0')}:00
@@ -608,6 +680,10 @@ export default function CalendarPage() {
                                                         <Clock className="h-3 w-3" />
                                                         <span>{appointment.duration} minutos</span>
                                                     </div>
+                                                </div>
+                                            ) : outsideAvail ? (
+                                                <div className="text-amber-400 text-sm flex items-center gap-2 opacity-60">
+                                                    <span>— Fuera de disponibilidad</span>
                                                 </div>
                                             ) : (
                                                 <div className="text-text-muted text-sm flex items-center gap-2">
@@ -640,17 +716,26 @@ export default function CalendarPage() {
                             {monthDays.map((day, idx) => {
                                 const dayAppts = getAppointmentsForDay(day);
                                 const isCurrentMonth = isSameMonth(day, currentMonth);
+                                const dayUnavail = isDayUnavailable(day);
 
                                 return (
                                     <div
                                         key={idx}
-                                        className={`min-h-[100px] p-2 border-r border-b border-neutral-100 ${!isCurrentMonth ? 'bg-neutral-50/50' : ''
-                                            } ${isToday(day) ? 'bg-primary/5' : ''}`}
+                                        className={`min-h-[100px] p-2 border-r border-b border-neutral-100
+                                            ${!isCurrentMonth ? 'bg-neutral-50/50' : ''}
+                                            ${isToday(day) ? 'bg-primary/5' : ''}
+                                            ${dayUnavail && isCurrentMonth ? 'bg-amber-50/60' : ''}
+                                        `}
                                     >
-                                        <div className={`text-sm font-semibold mb-1 ${isToday(day) ? 'text-primary' :
-                                            !isCurrentMonth ? 'text-text-muted' : 'text-secondary'
+                                        <div className={`text-sm font-semibold mb-1 flex items-center justify-between ${isToday(day) ? 'text-primary' :
+                                                !isCurrentMonth ? 'text-text-muted' : 'text-secondary'
                                             }`}>
-                                            {day.getDate()}
+                                            <span>{day.getDate()}</span>
+                                            {dayUnavail && isCurrentMonth && (
+                                                <span className="text-[9px] font-normal text-amber-500 bg-amber-100 px-1 rounded">
+                                                    No disponible
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="space-y-1">
                                             {dayAppts.slice(0, 3).map((apt, aptIdx) => (
@@ -683,7 +768,7 @@ export default function CalendarPage() {
                 )}
 
                 {/* Legend */}
-                <div className="flex items-center gap-6 mt-4 text-sm">
+                <div className="flex items-center gap-6 mt-4 text-sm flex-wrap">
                     <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded border-l-4 border-primary bg-primary/5"></div>
                         <span className="text-text-secondary">Confirmado</span>
@@ -693,8 +778,16 @@ export default function CalendarPage() {
                         <span className="text-text-secondary">Pendiente</span>
                     </div>
                     <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded border-l-4 border-blue-400 bg-blue-50"></div>
+                        <span className="text-text-secondary">Completado</span>
+                    </div>
+                    <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded border-l-4 border-neutral-300 bg-neutral-100"></div>
                         <span className="text-text-secondary">Cancelado</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-amber-50 border border-amber-200"></div>
+                        <span className="text-text-secondary">Fuera de disponibilidad</span>
                     </div>
                 </div>
 
