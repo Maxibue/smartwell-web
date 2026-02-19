@@ -11,16 +11,27 @@ export interface JitsiConfig {
     subject?: string;
     startWithAudioMuted?: boolean;
     startWithVideoMuted?: boolean;
+    isModerator?: boolean; // Professional = moderator, patient = participant
 }
 
 /**
- * Generate a unique room name for an appointment
+ * Room status lifecycle in Firestore (stored on the appointment document):
+ *   "waiting"    → Professional has not opened the room yet
+ *   "open"       → Professional opened the room, patients can join
+ *   "in_progress"→ Session is underway (both sides connected)
+ *   "ended"      → Session finished
  */
-export function generateRoomName(appointmentId: string, professionalId: string): string {
-    // Create a unique, URL-safe room name
-    const timestamp = Date.now();
-    const hash = btoa(`${appointmentId}-${professionalId}-${timestamp}`).replace(/[^a-zA-Z0-9]/g, '');
-    return `SmartWell-${hash.substring(0, 20)}`;
+export type RoomStatus = 'waiting' | 'open' | 'in_progress' | 'ended';
+
+/**
+ * Generate a deterministic, unique room name for an appointment.
+ * Using appointmentId only (no timestamp) so both sides derive the same name.
+ */
+export function generateRoomName(appointmentId: string): string {
+    const encoded = btoa(`smartwell-${appointmentId}`)
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .substring(0, 24);
+    return `SW-${encoded}`;
 }
 
 /**
@@ -32,48 +43,42 @@ export function generateJitsiUrl(roomName: string): string {
 }
 
 /**
- * Get Jitsi configuration for embedding
+ * Get Jitsi configuration for embedding.
+ * Moderators (professionals) get extra controls; patients get a minimal toolbar.
  */
 export function getJitsiConfig(config: JitsiConfig): any {
+    const moderatorToolbar = [
+        'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
+        'fodeviceselection', 'hangup', 'chat', 'settings', 'raisehand',
+        'videoquality', 'filmstrip', 'tileview', 'videobackgroundblur',
+        'mute-everyone', 'security',
+    ];
+
+    const participantToolbar = [
+        'microphone', 'camera', 'desktop', 'fullscreen',
+        'fodeviceselection', 'hangup', 'chat', 'raisehand',
+        'videoquality', 'filmstrip', 'videobackgroundblur',
+    ];
+
     return {
         roomName: config.roomName,
         width: '100%',
         height: '100%',
-        parentNode: undefined, // Will be set when mounting
+        parentNode: undefined, // Set when mounting
         configOverwrite: {
             startWithAudioMuted: config.startWithAudioMuted ?? false,
             startWithVideoMuted: config.startWithVideoMuted ?? false,
-            prejoinPageEnabled: true, // Enable pre-join page
+            prejoinPageEnabled: false, // We handle our own pre-join
             enableWelcomePage: false,
             enableClosePage: false,
             defaultLanguage: 'es',
             disableDeepLinking: true,
-            toolbarButtons: [
-                'microphone',
-                'camera',
-                'closedcaptions',
-                'desktop',
-                'fullscreen',
-                'fodeviceselection',
-                'hangup',
-                'chat',
-                'recording',
-                'livestreaming',
-                'etherpad',
-                'sharedvideo',
-                'settings',
-                'raisehand',
-                'videoquality',
-                'filmstrip',
-                'feedback',
-                'stats',
-                'shortcuts',
-                'tileview',
-                'videobackgroundblur',
-                'download',
-                'help',
-                'mute-everyone',
-            ],
+            /**
+             * Lobby mode: professionals skip lobby; patients wait until admitted.
+             * In meet.jit.si public rooms, we simulate this via roomStatus in Firestore.
+             */
+            enableLobbyChat: false,
+            toolbarButtons: config.isModerator ? moderatorToolbar : participantToolbar,
         },
         interfaceConfigOverwrite: {
             SHOW_JITSI_WATERMARK: false,
@@ -81,12 +86,12 @@ export function getJitsiConfig(config: JitsiConfig): any {
             SHOW_BRAND_WATERMARK: false,
             BRAND_WATERMARK_LINK: '',
             SHOW_POWERED_BY: false,
-            DEFAULT_BACKGROUND: '#1a1a2e',
+            DEFAULT_BACKGROUND: '#0f172a',
             DEFAULT_REMOTE_DISPLAY_NAME: 'Participante',
             DEFAULT_LOCAL_DISPLAY_NAME: 'Yo',
             MOBILE_APP_PROMO: false,
             TOOLBAR_ALWAYS_VISIBLE: false,
-            SETTINGS_SECTIONS: ['devices', 'language', 'moderator', 'profile', 'calendar'],
+            SETTINGS_SECTIONS: ['devices', 'language', 'profile'],
             FILM_STRIP_MAX_HEIGHT: 120,
             RECENT_LIST_ENABLED: false,
         },
@@ -98,43 +103,46 @@ export function getJitsiConfig(config: JitsiConfig): any {
 }
 
 /**
- * Check if a meeting should be accessible
- * (15 minutes before to 30 minutes after scheduled time)
+ * Check if a meeting window is open based on scheduled time.
+ * Access window: 15 min before → duration + 30 min after.
  */
-export function isMeetingAccessible(appointmentDate: string, appointmentTime: string): boolean {
+export function isMeetingTimeWindow(
+    appointmentDate: string,
+    appointmentTime: string,
+    durationMinutes: number = 60,
+): boolean {
     const now = new Date();
-
-    // Parse appointment date and time
     const [year, month, day] = appointmentDate.split('-').map(Number);
     const [hours, minutes] = appointmentTime.split(':').map(Number);
-
     const appointmentDateTime = new Date(year, month - 1, day, hours, minutes);
 
-    // Allow access 15 minutes before
     const accessStartTime = new Date(appointmentDateTime.getTime() - 15 * 60 * 1000);
-
-    // Allow access up to 30 minutes after scheduled end (assuming 1 hour sessions)
-    const accessEndTime = new Date(appointmentDateTime.getTime() + 90 * 60 * 1000);
+    const accessEndTime = new Date(appointmentDateTime.getTime() + (durationMinutes + 30) * 60 * 1000);
 
     return now >= accessStartTime && now <= accessEndTime;
 }
 
+/** @deprecated Use isMeetingTimeWindow */
+export function isMeetingAccessible(appointmentDate: string, appointmentTime: string): boolean {
+    return isMeetingTimeWindow(appointmentDate, appointmentTime);
+}
+
 /**
- * Get time until meeting is accessible
+ * Get time until meeting is accessible (for the countdown UI).
  */
-export function getTimeUntilMeeting(appointmentDate: string, appointmentTime: string): {
+export function getTimeUntilMeeting(
+    appointmentDate: string,
+    appointmentTime: string,
+): {
     accessible: boolean;
     minutesUntil?: number;
     message: string;
 } {
     const now = new Date();
-
     const [year, month, day] = appointmentDate.split('-').map(Number);
     const [hours, minutes] = appointmentTime.split(':').map(Number);
-
     const appointmentDateTime = new Date(year, month - 1, day, hours, minutes);
     const accessStartTime = new Date(appointmentDateTime.getTime() - 15 * 60 * 1000);
-
     const minutesUntil = Math.floor((accessStartTime.getTime() - now.getTime()) / (60 * 1000));
 
     if (minutesUntil > 60) {
@@ -142,7 +150,7 @@ export function getTimeUntilMeeting(appointmentDate: string, appointmentTime: st
         return {
             accessible: false,
             minutesUntil,
-            message: `La videollamada estará disponible ${hoursUntil} hora${hoursUntil > 1 ? 's' : ''} antes de tu sesión`,
+            message: `La videollamada estará disponible en ${hoursUntil} hora${hoursUntil > 1 ? 's' : ''}`,
         };
     } else if (minutesUntil > 0) {
         return {

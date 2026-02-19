@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState } from "react";
@@ -25,7 +24,8 @@ interface Professional {
     id: string;
     name: string;
     specialty: string;
-    category: string;
+    category: string; // Legacy
+    categories: string[]; // New multi-category support
     rating: number;
     reviews: number;
     price: number;
@@ -61,11 +61,16 @@ export default function SearchPage() {
                     const status = data.status; // Strict check: must be explicitly approved
 
                     if (status === "approved") {
+                        const cats = Array.isArray(data.categories) && data.categories.length > 0
+                            ? data.categories
+                            : (data.category ? [data.category] : ["salud-mental"]);
+
                         fetchedPros.push({
                             id: doc.id,
                             name: data.fullName || data.name || "Profesional",
                             specialty: data.specialty || "General",
                             category: data.category || "salud-mental",
+                            categories: cats,
                             rating: data.rating || 5.0,
                             reviews: data.reviews || 0,
                             price: data.price || 0,
@@ -85,6 +90,7 @@ export default function SearchPage() {
                         name: "Lic. Mariana Costa",
                         specialty: "Psicóloga Clínica",
                         category: "salud-mental",
+                        categories: ["salud-mental"],
                         rating: 4.9,
                         reviews: 32,
                         price: 45000,
@@ -98,6 +104,7 @@ export default function SearchPage() {
                         name: "Lic. Lucas Funes",
                         specialty: "Nutricionista Deportivo",
                         category: "nutricion-integral",
+                        categories: ["nutricion-integral"],
                         rating: 4.8,
                         reviews: 18,
                         price: 35000,
@@ -111,6 +118,7 @@ export default function SearchPage() {
                         name: "Lic. Sofía Mendez",
                         specialty: "Puericultora & Psicóloga",
                         category: "maternidad-crianza",
+                        categories: ["maternidad-crianza", "salud-mental"],
                         rating: 5.0,
                         reviews: 15,
                         price: 40000,
@@ -124,6 +132,7 @@ export default function SearchPage() {
                         name: "Lic. Javier Ortiz",
                         specialty: "Psicólogo de Pareja",
                         category: "salud-mental",
+                        categories: ["salud-mental"],
                         rating: 4.7,
                         reviews: 21,
                         price: 48000,
@@ -137,6 +146,7 @@ export default function SearchPage() {
                         name: "Lic. Roberto Diaz",
                         specialty: "Coach Ontológico",
                         category: "desarrollo-personal-profesional",
+                        categories: ["desarrollo-personal-profesional"],
                         rating: 4.9,
                         reviews: 28,
                         price: 50000,
@@ -165,7 +175,7 @@ export default function SearchPage() {
     }, []);
 
     const filteredPros = professionals.filter(pro =>
-        (selectedSpecialty === "Todos" || pro.category === selectedSpecialty) &&
+        (selectedSpecialty === "Todos" || pro.categories.includes(selectedSpecialty)) && // Updated filter logic
         (pro.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             pro.specialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
             pro.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
@@ -253,6 +263,8 @@ export default function SearchPage() {
                                         </div>
 
                                         <div className="mt-4 flex flex-wrap gap-2">
+                                            {/* Show category badge if needed, or just tags */}
+                                            {/* For now, keeping tags as they were */}
                                             {pro.tags.map(tag => (
                                                 <span key={tag} className="px-2 py-1 bg-neutral-50 text-text-secondary text-xs rounded-md border border-neutral-100">
                                                     {tag}
@@ -282,4 +294,3 @@ export default function SearchPage() {
         </div>
     );
 }
-

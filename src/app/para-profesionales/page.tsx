@@ -25,7 +25,7 @@ export default function ProfessionalLandingPage() {
                                 RED PROFESIONAL
                             </div>
                             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold font-display tracking-tight text-secondary leading-[1.15]">
-                                Formá parte de la Red Profesional Curada de Bienestar en LATAM.
+                                Formá parte de la Red Profesional Validada de Bienestar en LATAM.
                             </h1>
                             <p className="text-lg md:text-xl text-text-secondary leading-relaxed">
                                 Conectamos especialistas en salud mental, nutrición y desarrollo humano con personas que buscan acompañamiento real y confiable.
@@ -122,7 +122,7 @@ export default function ProfessionalLandingPage() {
                             <div className="p-4 bg-secondary/10 text-secondary rounded-xl mb-2 group-hover:scale-110 transition-transform duration-300">
                                 <ShieldCheck className="h-8 w-8" />
                             </div>
-                            <h3 className="text-xl font-bold text-secondary font-display">Pertenencia a una red curada</h3>
+                            <h3 className="text-xl font-bold text-secondary font-display">Pertenencia a una red validada</h3>
                             <p className="text-text-secondary leading-relaxed">
                                 No cualquiera entra. Formás parte de un estándar profesional que te posiciona y avala.
                             </p>

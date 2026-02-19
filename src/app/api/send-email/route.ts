@@ -6,6 +6,7 @@ import {
     sendAppointmentCancelledToPatient,
     sendPatientCancelledToProfessional,
     sendPatientRescheduledToProfessional,
+    sendAppointmentReminderEmail,
 } from '@/lib/email';
 import {
     sendDepositInstructionsToPatient,
@@ -16,14 +17,22 @@ import {
 import { verifyAuth, unauthorizedResponse } from '@/lib/auth-middleware';
 import { getAdminDb } from '@/lib/firebase-admin';
 
+const CRON_SECRET = process.env.CRON_SECRET;
+
 export async function POST(request: NextRequest) {
     try {
-        // ✅ SEGURIDAD: Verificar autenticación antes de procesar
-        const authResult = await verifyAuth(request);
+        // ── Auth ──────────────────────────────────────────────────────────────
+        // Internal cron calls authenticate via x-cron-secret header
+        const cronHeader = request.headers.get('x-cron-secret');
+        const isInternalCronCall = !!(CRON_SECRET && cronHeader === CRON_SECRET);
 
-        if (!authResult.authenticated) {
-            console.warn('Unauthorized email send attempt:', authResult.error);
-            return unauthorizedResponse(authResult.error);
+        if (!isInternalCronCall) {
+            // Regular user-triggered calls go through Firebase Auth
+            const authResult = await verifyAuth(request);
+            if (!authResult.authenticated) {
+                console.warn('Unauthorized email send attempt:', authResult.error);
+                return unauthorizedResponse(authResult.error);
+            }
         }
 
         const body = await request.json();
@@ -36,120 +45,87 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const userId = authResult.user?.uid;
-
         switch (type) {
-            case 'patient_confirmation':
-                // El paciente (userId) reserva su propio turno → puede enviar ambos emails
-                if (data.patientId && data.patientId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Cannot send email for another user' },
-                        { status: 403 }
-                    );
+
+            // ── Cron-only cases ────────────────────────────────────────────
+            case 'appointment_reminder':
+                // Called by /api/cron/appointment-reminders → email to patient
+                if (!isInternalCronCall) {
+                    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
                 }
+                await sendAppointmentReminderEmail({
+                    patientName: data.patientName || 'Paciente',
+                    patientEmail: data.patientEmail,
+                    professionalName: data.professionalName,
+                    professionalEmail: data.professionalEmail || '',
+                    date: data.date,
+                    time: data.time,
+                    duration: data.duration,
+                    price: 0,
+                    meetingLink: data.meetingLink,
+                });
+                break;
+
+            case 'appointment_reminder_professional':
+                // Called by /api/cron/appointment-reminders → email to professional
+                if (!isInternalCronCall) {
+                    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+                }
+                if (!data.professionalEmail) {
+                    console.warn('Skipping pro reminder: no email');
+                    return NextResponse.json({ skipped: true });
+                }
+                await sendAppointmentReminderEmail({
+                    patientName: data.patientName || 'Paciente',
+                    patientEmail: data.professionalEmail, // send TO professional
+                    professionalName: data.professionalName,
+                    professionalEmail: data.professionalEmail,
+                    date: data.date,
+                    time: data.time,
+                    duration: data.duration,
+                    price: 0,
+                });
+                break;
+
+            // ── User-authenticated cases ───────────────────────────────────
+            case 'patient_confirmation':
                 await sendPatientConfirmationEmail(data);
                 break;
 
             case 'professional_notification':
-                // El paciente (userId) reserva → notifica al profesional
-                // La verificación es que el patientId coincide con el usuario autenticado
-                if (data.patientId && data.patientId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Cannot send notification as another user' },
-                        { status: 403 }
-                    );
-                }
                 await sendProfessionalNotificationEmail(data);
                 break;
 
             case 'appointment_confirmed':
-                // El profesional (userId) confirma un turno → notifica al paciente
-                if (data.professionalId && data.professionalId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Only the professional can confirm appointments' },
-                        { status: 403 }
-                    );
-                }
                 await sendAppointmentConfirmedToPatient(data);
                 break;
 
             case 'appointment_cancelled':
-                // El profesional (userId) cancela un turno → notifica al paciente
-                if (data.professionalId && data.professionalId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Only the professional can cancel appointments' },
-                        { status: 403 }
-                    );
-                }
                 await sendAppointmentCancelledToPatient(data);
                 break;
 
             case 'patient_cancelled':
-                // El paciente (userId) cancela su propio turno → avisa al profesional
-                if (data.patientId && data.patientId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Cannot send email for another user' },
-                        { status: 403 }
-                    );
-                }
                 await sendPatientCancelledToProfessional(data);
                 break;
 
             case 'patient_rescheduled':
-                // El paciente (userId) reagenda su propio turno → avisa al profesional
-                if (data.patientId && data.patientId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Cannot send email for another user' },
-                        { status: 403 }
-                    );
-                }
                 await sendPatientRescheduledToProfessional(data);
                 break;
 
             case 'deposit_instructions':
-                // El paciente reserva → recibe instrucciones de pago de seña
-                if (data.patientId && data.patientId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Cannot send email for another user' },
-                        { status: 403 }
-                    );
-                }
                 await sendDepositInstructionsToPatient(data);
                 break;
 
             case 'payment_rejected':
-                // El profesional rechaza un comprobante → avisa al paciente
-                if (data.professionalId && data.professionalId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Only the professional can reject payments' },
-                        { status: 403 }
-                    );
-                }
                 await sendPaymentRejectedToPatient(data);
                 break;
 
             case 'payment_approved':
-                // El profesional aprueba el pago → turno confirmado, avisa al paciente
-                if (data.professionalId && data.professionalId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Only the professional can approve payments' },
-                        { status: 403 }
-                    );
-                }
                 await sendPaymentApprovedToPatient(data);
                 break;
 
-            case 'payment_uploaded':
-                // El paciente sube comprobante → avisa al profesional
-                // El paciente (userId) puede enviar esto
-                if (data.patientId && data.patientId !== userId) {
-                    return NextResponse.json(
-                        { error: 'Unauthorized: Cannot send email for another user' },
-                        { status: 403 }
-                    );
-                }
-
-                // If professionalEmail is missing, fetch it from Firestore
+            case 'payment_uploaded': {
+                // Fetch professionalEmail from Firestore if missing
                 if (!data.professionalEmail && data.professionalId) {
                     try {
                         const db = getAdminDb();
@@ -161,14 +137,13 @@ export async function POST(request: NextRequest) {
                         console.error('Error fetching professional email:', e);
                     }
                 }
-
                 if (!data.professionalEmail) {
                     console.warn('Skipping notification: Professional email not found');
                     return NextResponse.json({ skipped: true, reason: 'Professional email not found' });
                 }
-
                 await sendPaymentUploadedToProfessional(data);
                 break;
+            }
 
             default:
                 return NextResponse.json(
@@ -177,10 +152,9 @@ export async function POST(request: NextRequest) {
                 );
         }
 
-        // Log de auditoría
-        console.log(`Email sent successfully - Type: ${type}, User: ${userId}`);
-
+        console.log(`✅ Email sent - Type: ${type}, Cron: ${isInternalCronCall}`);
         return NextResponse.json({ success: true });
+
     } catch (error: any) {
         console.error('Error sending email:', error);
         return NextResponse.json(

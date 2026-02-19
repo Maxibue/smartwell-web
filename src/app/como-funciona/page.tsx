@@ -49,7 +49,7 @@ export default function HowItWorksPage() {
                             <div className="absolute top-8 right-8 font-display text-6xl text-neutral-100 font-bold -z-10 select-none">2</div>
                             <h3 className="text-lg font-bold text-secondary mb-3">Tu match ideal</h3>
                             <p className="text-text-secondary text-sm leading-relaxed">
-                                Te mostramos los profesionales más adecuados de nuestra red curada para ayudarte.
+                                Te mostramos los profesionales más adecuados de nuestra red validada para ayudarte.
                             </p>
                         </div>
 

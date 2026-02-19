@@ -8,9 +8,8 @@ import { User as UserIcon, Mail, Phone, Award, DollarSign, Clock, Loader2, Save,
 import { db, auth } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { PROFESSIONAL_CATEGORIES, getCategoryName, getSubcategories } from "@/lib/categories";
+import { PROFESSIONAL_CATEGORIES, getSubcategories } from "@/lib/categories";
 import { sanitizeText, sanitizeHTML, sanitizePhone, sanitizeURL, detectXSS } from "@/lib/sanitize";
-import { ProfessionalAvatar } from "@/components/ui/ProfessionalAvatar";
 
 interface ProfessionalProfile {
     uid: string;
@@ -19,7 +18,8 @@ interface ProfessionalProfile {
     phone?: string;
     title: string;
     bio: string;
-    category: string;
+    category: string; // Mantener para compatibilidad
+    categories?: string[]; // Array para múltiples categorías
     price: string;
     duration: string;
     image: string;
@@ -60,6 +60,7 @@ export default function ProfilePage() {
         title: "",
         bio: "",
         category: "salud-mental",
+        categories: ["salud-mental"],
         price: "",
         duration: "50",
         image: "",
@@ -78,6 +79,12 @@ export default function ProfilePage() {
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {
                         const data = docSnap.data();
+
+                        // Determinar categorías (si no existe array, usar la única categoría)
+                        const loadedCategories = Array.isArray(data.categories) && data.categories.length > 0
+                            ? data.categories
+                            : (data.category ? [data.category] : ["salud-mental"]);
+
                         setProfile({
                             uid: currentUser.uid,
                             name: data.name || currentUser.displayName || "",
@@ -85,7 +92,8 @@ export default function ProfilePage() {
                             phone: data.phone || "",
                             title: data.title || "",
                             bio: data.description || "",
-                            category: data.category || "salud-mental",
+                            category: data.category || loadedCategories[0] || "salud-mental",
+                            categories: loadedCategories,
                             price: data.price?.toString() || "",
                             duration: data.duration?.toString() || "50",
                             image: data.image || data.profileImage || "",
@@ -114,8 +122,29 @@ export default function ProfilePage() {
         return () => unsubscribe();
     }, []);
 
-    const handleChange = (field: keyof ProfessionalProfile, value: string) => {
+    const handleChange = (field: keyof ProfessionalProfile, value: string | string[]) => {
         setProfile(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleCategoryChange = (catId: string, checked: boolean) => {
+        setProfile(prev => {
+            let newCategories = prev.categories ? [...prev.categories] : [];
+
+            if (checked) {
+                if (!newCategories.includes(catId)) newCategories.push(catId);
+            } else {
+                newCategories = newCategories.filter(id => id !== catId);
+            }
+
+            // Actualizar la categoría principal (legacy) con la primera del array
+            const newMainCategory = newCategories.length > 0 ? newCategories[0] : "";
+
+            return {
+                ...prev,
+                categories: newCategories,
+                category: newMainCategory
+            };
+        });
     };
 
     // ── Helpers de servicios ─────────────────────────────────────────────────
@@ -127,7 +156,12 @@ export default function ProfilePage() {
     const updateService = (id: string, field: keyof Omit<Service, 'id'>, value: string | number) =>
         setServices(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
 
-    const subcategories = getSubcategories(profile.category);
+    // Obtener subcategorías de TODAS las categorías seleccionadas
+    const availableSubcategories = Array.from(new Set(
+        (profile.categories || [profile.category])
+            .filter(Boolean)
+            .flatMap(catId => getSubcategories(catId))
+    )).sort();
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -137,6 +171,11 @@ export default function ProfilePage() {
         const validServices = services.filter(s => s.name.trim() !== '');
         if (validServices.length === 0) {
             alert('Por favor agrega al menos un servicio con nombre.');
+            return;
+        }
+
+        if (!profile.categories || profile.categories.length === 0) {
+            alert('Por favor seleccioná al menos una categoría profesional.');
             return;
         }
 
@@ -177,7 +216,8 @@ export default function ProfilePage() {
                 phone: sanitizedPhone,
                 title: sanitizedTitle,
                 description: sanitizedBio,
-                category: profile.category,
+                category: profile.category, // Legacy
+                categories: profile.categories, // Nueva funcionalidad
                 services: sanitizedServices,
                 // Compatibilidad con campos legacy
                 specialty: baseService.name,
@@ -214,7 +254,7 @@ export default function ProfilePage() {
             profile.name.trim() !== "" &&
             profile.title.trim() !== "" &&
             profile.bio.trim().length >= 100 &&
-            profile.category.trim() !== "" &&
+            (profile.categories && profile.categories.length > 0) &&
             validServices.length > 0 &&
             validServices.some(s => s.price > 0)
         );
@@ -224,7 +264,7 @@ export default function ProfilePage() {
         if (!user) return;
 
         if (!isProfileComplete()) {
-            alert("Por favor completá todos los campos requeridos antes de solicitar revisión:\n\n• Nombre completo\n• Título profesional\n• Biografía (mínimo 100 caracteres)\n• Especialidad\n• Categoría\n• Precio base");
+            alert("Por favor completá todos los campos requeridos antes de solicitar revisión:\n\n• Nombre completo\n• Título profesional\n• Biografía (mínimo 100 caracteres)\n• Al menos una categoría\n• Al menos un servicio con precio");
             return;
         }
 
@@ -299,30 +339,44 @@ export default function ProfilePage() {
 
                 {/* Left Column: Image & Basic Info */}
                 <div className="md:col-span-1 space-y-6">
-                    {/* Profile Image */}
+                    {/* Profile Image (Color Picker) */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex flex-col items-center text-center">
-                        <div className="relative mb-4">
-                            <ProfessionalAvatar
-                                name={profile.name}
-                                imageUrl={profile.image}
-                                size="xl"
-                            />
+                        <div className="relative mb-6">
+                            <div
+                                className={`w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-md transition-colors duration-300`}
+                                style={{ backgroundColor: profile.image.startsWith('#') ? profile.image : '#10b981' }}
+                            >
+                                {profile.name ? profile.name.charAt(0).toUpperCase() : <UserIcon className="h-10 w-10 text-white/50" />}
+                            </div>
                         </div>
 
-                        <p className="text-xs text-text-muted mb-4">
-                            Ingresá la URL de tu foto de perfil.
+                        <p className="text-sm font-semibold text-secondary mb-3">
+                            Elegí el color de tu perfil
                         </p>
 
-                        <div className="w-full">
-                            <Label htmlFor="image-url" className="text-left block mb-1">URL de Imagen</Label>
-                            <Input
-                                id="image-url"
-                                value={profile.image}
-                                onChange={(e) => handleChange('image', e.target.value)}
-                                placeholder="https://..."
-                                className="text-xs"
-                            />
+                        <div className="flex gap-2 justify-center flex-wrap px-4">
+                            {[
+                                '#10b981', // Emerald
+                                '#3b82f6', // Blue
+                                '#6366f1', // Indigo
+                                '#8b5cf6', // Violet
+                                '#f43f5e', // Rose
+                                '#f97316', // Orange
+                                '#14b8a6', // Teal
+                            ].map((color) => (
+                                <button
+                                    key={color}
+                                    type="button"
+                                    onClick={() => handleChange('image', color)}
+                                    className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${profile.image === color ? 'border-neutral-800 scale-110' : 'border-transparent'}`}
+                                    style={{ backgroundColor: color }}
+                                    aria-label={`Seleccionar color ${color}`}
+                                />
+                            ))}
                         </div>
+                        <p className="text-xs text-text-muted mt-4">
+                            Este color aparecerá como fondo de tu inicial en los listados.
+                        </p>
                     </div>
 
                     {/* Contact Info */}
@@ -391,10 +445,27 @@ export default function ProfilePage() {
                                 id="bio"
                                 value={profile.bio}
                                 onChange={(e) => handleChange('bio', e.target.value)}
-                                placeholder="Contale a tus pacientes sobre tu experiencia, enfoque y cómo podés ayudarlos..."
+                                placeholder="Escribí aquí tu biografía..."
                                 className="resize-none"
                                 rows={5}
                             />
+
+                            {/* Bio Helper Tip */}
+                            {profile.bio.length < 50 && (
+                                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-800 flex gap-2 animate-in fade-in slide-in-from-top-1 mt-2">
+                                    <Info className="h-5 w-5 text-blue-500 shrink-0" />
+                                    <div>
+                                        <p className="font-semibold text-blue-900 mb-1">¿Qué escribir en tu biografía?</p>
+                                        <ul className="list-disc list-inside space-y-1 text-xs text-blue-700/90">
+                                            <li>Tu experiencia y años de práctica.</li>
+                                            <li>Tu enfoque terapéutico (ej: TCC, Psicoanálisis).</li>
+                                            <li>El tipo de problemas que tratás (ej: ansiedad, duelos).</li>
+                                            <li>Algo personal que genere confianza.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
+
                             <p className="text-xs text-text-muted text-right">Mínimo 100 caracteres recomendado.</p>
                         </div>
                     </div>
@@ -407,28 +478,39 @@ export default function ProfilePage() {
                             </h3>
                         </div>
 
-                        {/* Categoría Principal */}
-                        <div className="space-y-2">
-                            <Label htmlFor="category">Categoría Principal</Label>
-                            <select
-                                id="category"
-                                value={profile.category}
-                                onChange={(e) => {
-                                    handleChange('category', e.target.value);
-                                    // Resetear nombre de servicios al cambiar categoría
-                                    setServices(prev => prev.map(s => ({ ...s, name: '' })));
-                                }}
-                                className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                            >
-                                <option value="">Seleccionar categoría</option>
+                        {/* Categorías Principales (Multi-select) */}
+                        <div className="space-y-3">
+                            <Label className="text-base text-secondary">Categorías Profesionales</Label>
+                            <p className="text-xs text-text-muted mb-2">Seleccioná todas las áreas que correspondan a tu práctica.</p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {CATEGORIES.map(cat => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    <label
+                                        key={cat.id}
+                                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${profile.categories?.includes(cat.id)
+                                                ? 'bg-primary/5 border-primary shadow-sm'
+                                                : 'bg-white border-neutral-200 hover:bg-neutral-50'
+                                            }`}
+                                    >
+                                        <div className="flex items-center justify-center w-5 h-5">
+                                            <input
+                                                type="checkbox"
+                                                checked={profile.categories?.includes(cat.id)}
+                                                onChange={(e) => handleCategoryChange(cat.id, e.target.checked)}
+                                                className="w-4 h-4 rounded border-neutral-300 text-primary focus:ring-primary"
+                                            />
+                                        </div>
+                                        <span className={`text-sm ${profile.categories?.includes(cat.id) ? 'font-semibold text-primary-dark' : 'text-text-secondary'
+                                            }`}>
+                                            {cat.name}
+                                        </span>
+                                    </label>
                                 ))}
-                            </select>
+                            </div>
                         </div>
 
                         {/* Lista de Servicios */}
-                        <div className="space-y-4">
+                        <div className="space-y-4 pt-4 border-t border-neutral-100">
                             <div className="flex items-center justify-between">
                                 <Label className="text-sm font-semibold text-secondary">Servicios Ofrecidos</Label>
                                 <button
@@ -474,9 +556,13 @@ export default function ProfilePage() {
                                             required
                                         >
                                             <option value="">Seleccionar servicio...</option>
-                                            {subcategories.map(sub => (
+                                            {availableSubcategories.map(sub => (
                                                 <option key={sub} value={sub}>{sub}</option>
                                             ))}
+                                            {/* Si el servicio actual no está en la lista (por cambio de categoría), mantenerlo visible */}
+                                            {service.name && !availableSubcategories.includes(service.name) && (
+                                                <option value={service.name}>{service.name} (Categoría no seleccionada)</option>
+                                            )}
                                         </select>
                                     </div>
 
@@ -529,9 +615,9 @@ export default function ProfilePage() {
                                 </div>
                             ))}
 
-                            {subcategories.length === 0 && profile.category && (
+                            {availableSubcategories.length === 0 && (!profile.categories || profile.categories.length === 0) && (
                                 <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                                    Seleccioná una categoría principal para ver los servicios disponibles.
+                                    Seleccioná al menos una categoría principal para ver los servicios disponibles.
                                 </p>
                             )}
                         </div>
@@ -614,6 +700,7 @@ export default function ProfilePage() {
                         )}
                     </div>
                 </div>
+
             </form>
         </div>
     );

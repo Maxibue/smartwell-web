@@ -13,6 +13,7 @@ import { ReviewList } from "@/components/ReviewList";
 import { ReviewStatsDisplay } from "@/components/ReviewStatsDisplay";
 import { getProfessionalReviews, getReviewStats, Review, ReviewStats } from "@/lib/reviews";
 import { ProfessionalAvatar } from "@/components/ui/ProfessionalAvatar";
+import { getCategoryName } from "@/lib/categories";
 
 interface Service {
     id: string;
@@ -27,7 +28,8 @@ interface Professional {
     lastName: string;
     title: string;
     specialty: string;
-    category: string;
+    category: string; // Legacy field
+    categories?: string[]; // New multi-category field
     bio?: string;
     price: number;
     sessionDuration: number;
@@ -76,6 +78,7 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
                         title: "Lic.",
                         specialty: "Psicóloga Clínica",
                         category: "Salud Mental",
+                        categories: ["salud-mental"],
                         bio: "Especialista en terapia cognitivo-conductual con más de 10 años de experiencia.",
                         price: 45000,
                         sessionDuration: 50,
@@ -90,6 +93,7 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
                         title: "Lic.",
                         specialty: "Nutricionista Deportivo",
                         category: "Nutrición",
+                        categories: ["nutricion-integral"],
                         bio: "Ayudo a deportistas a alcanzar su máximo rendimiento a través de la alimentación.",
                         price: 35000,
                         sessionDuration: 50,
@@ -120,12 +124,18 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
                     lastName = parts.slice(1).join(" ") || "";
                 }
 
+                // Determinar categorías (array)
+                const categories = Array.isArray(data.categories) && data.categories.length > 0
+                    ? data.categories
+                    : (data.category ? [data.category] : []);
+
                 setProfessional({
                     firstName,
                     lastName,
                     title: data.title || "",
                     specialty: data.specialty || data.specialization || "",
                     category: data.category || "",
+                    categories: categories,
                     bio: data.bio || data.description || "",
                     price: data.price || 0,
                     sessionDuration: data.sessionDuration || data.duration || 50,
@@ -195,25 +205,6 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
             </div>
         );
     }
-
-    // Only show approved professionals (commented for development)
-    // if (professional.status !== "approved") {
-    //     return (
-    //         <div className="min-h-screen bg-neutral-50 flex flex-col">
-    //             <Navbar />
-    //             <div className="flex-1 flex items-center justify-center">
-    //                 <div className="text-center">
-    //                     <p className="text-xl text-text-secondary mb-4">
-    //                         Este perfil no está disponible
-    //                     </p>
-    //                     <Link href="/profesionales">
-    //                         <Button>Ver Profesionales</Button>
-    //                     </Link>
-    //                 </div>
-    //             </div>
-    //         </div>
-    //     );
-    // }
 
     return (
         <div className="min-h-screen bg-neutral-50 flex flex-col">
@@ -288,14 +279,21 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
 
                             {/* Specialties */}
                             <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-8">
-                                <h2 className="text-2xl font-bold text-secondary mb-4">Especialidad</h2>
+                                <h2 className="text-2xl font-bold text-secondary mb-4">Áreas de Atención</h2>
                                 <div className="flex flex-wrap gap-2">
-                                    <span className="px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium">
-                                        {professional.specialty}
-                                    </span>
-                                    <span className="px-4 py-2 bg-neutral-100 text-secondary rounded-full text-sm font-medium">
-                                        {professional.category}
-                                    </span>
+                                    {/* Categorías (Badges) */}
+                                    {professional.categories && professional.categories.length > 0 ? (
+                                        professional.categories.map((catId) => (
+                                            <span key={catId} className="px-4 py-2 bg-neutral-100 text-secondary rounded-full text-sm font-medium border border-neutral-200">
+                                                {getCategoryName(catId)}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        // Fallback legacy
+                                        <span className="px-4 py-2 bg-neutral-100 text-secondary rounded-full text-sm font-medium border border-neutral-200">
+                                            {getCategoryName(professional.category) || professional.category}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
