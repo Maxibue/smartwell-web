@@ -19,6 +19,7 @@ interface Appointment {
     professionalId: string;
     professionalTitle?: string;
     professionalSpecialty: string;
+    professionalEmail?: string;
     price: number;
     date: string;
     time: string;
@@ -97,17 +98,19 @@ export default function UserAppointmentsPage() {
         return getTimeUntilMeeting(appointment.date, appointment.time);
     };
 
-    const getStatusBadge = (status: AppointmentStatus) => {
-        const badges = {
+    const getStatusBadge = (status: AppointmentStatus | string) => {
+        const badges: Record<string, { label: string; color: string; icon: any }> = {
             pending: { label: 'Pendiente', color: 'bg-amber-100 text-amber-800', icon: Clock },
             confirmed: { label: 'Confirmado', color: 'bg-green-100 text-green-800', icon: CheckCircle2 },
             in_progress: { label: 'En Curso', color: 'bg-blue-100 text-blue-800', icon: Video },
             cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-800', icon: X },
             completed: { label: 'Completado', color: 'bg-neutral-100 text-neutral-800', icon: CheckCircle2 },
+            pending_payment: { label: '💳 Esperando seña', color: 'bg-amber-100 text-amber-800', icon: Clock },
+            payment_submitted: { label: '⏳ Verificando pago', color: 'bg-blue-100 text-blue-800', icon: Clock },
+            payment_rejected: { label: '⚠️ Pago rechazado', color: 'bg-red-100 text-red-700', icon: X },
         };
         const badge = badges[status] || badges.pending;
         const Icon = badge.icon;
-
         return (
             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
                 <Icon className="h-3 w-3" />
@@ -255,7 +258,26 @@ export default function UserAppointmentsPage() {
 
                                         {/* Right: Actions */}
                                         <div className="flex flex-col sm:flex-row gap-2 sm:min-w-[280px] lg:justify-end">
-                                            {viewMode === 'upcoming' && (
+                                            {/* CTA de Seña */}
+                                            {(appointment.status === 'pending_payment' || appointment.status === 'payment_rejected') && (
+                                                <Link href={`/reservar/pago/${appointment.id}`} className="flex-1 sm:flex-initial">
+                                                    <Button
+                                                        className={`w-full flex items-center justify-center gap-2 ${appointment.status === 'payment_rejected'
+                                                                ? 'bg-amber-500 hover:bg-amber-600'
+                                                                : 'bg-emerald-500 hover:bg-emerald-600'
+                                                            } text-white`}
+                                                    >
+                                                        💳 {appointment.status === 'payment_rejected' ? 'Reintentar pago' : 'Subir comprobante'}
+                                                    </Button>
+                                                </Link>
+                                            )}
+                                            {appointment.status === 'payment_submitted' && (
+                                                <div className="flex items-center gap-2 text-blue-600 text-sm bg-blue-50 rounded-lg px-3 py-2">
+                                                    <Clock className="h-4 w-4 flex-shrink-0" />
+                                                    <span className="font-medium">Comprobante enviado — esperando verificación</span>
+                                                </div>
+                                            )}
+                                            {viewMode === 'upcoming' && !['pending_payment', 'payment_submitted', 'payment_rejected'].includes(appointment.status) && (
                                                 <>
                                                     {videoStatus.accessible ? (
                                                         <Link href={`/videollamada?appointment=${appointment.id}`} className="flex-1 sm:flex-initial">
@@ -318,7 +340,12 @@ export default function UserAppointmentsPage() {
                     appointmentId={cancelModal.appointment.id}
                     appointmentDate={cancelModal.appointment.date}
                     appointmentTime={cancelModal.appointment.time}
+                    appointmentDuration={cancelModal.appointment.duration}
                     professionalName={`${cancelModal.appointment.professionalTitle} ${cancelModal.appointment.professionalName}`}
+                    professionalEmail={cancelModal.appointment.professionalEmail}
+                    patientId={user?.uid}
+                    patientName={user?.displayName || user?.email || undefined}
+                    patientEmail={user?.email || undefined}
                     userType="patient"
                     onClose={() => setCancelModal({ show: false, appointment: null })}
                     onSuccess={handleCancelSuccess}
@@ -330,8 +357,13 @@ export default function UserAppointmentsPage() {
                     appointmentId={rescheduleModal.appointment.id}
                     professionalId={rescheduleModal.appointment.professionalId}
                     professionalName={`${rescheduleModal.appointment.professionalTitle} ${rescheduleModal.appointment.professionalName}`}
+                    professionalEmail={rescheduleModal.appointment.professionalEmail}
+                    patientId={user?.uid}
+                    patientName={user?.displayName || user?.email || undefined}
+                    patientEmail={user?.email || undefined}
                     currentDate={rescheduleModal.appointment.date}
                     currentTime={rescheduleModal.appointment.time}
+                    duration={rescheduleModal.appointment.duration}
                     onClose={() => setRescheduleModal({ show: false, appointment: null })}
                     onSuccess={handleRescheduleSuccess}
                 />

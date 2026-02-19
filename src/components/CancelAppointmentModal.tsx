@@ -4,12 +4,18 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { X, AlertTriangle, Loader2 } from 'lucide-react';
 import { cancelAppointment, checkCancellationPolicy } from '@/lib/appointments';
+import { auth } from '@/lib/firebase';
 
 interface CancelAppointmentModalProps {
     appointmentId: string;
     appointmentDate: string;
     appointmentTime: string;
+    appointmentDuration?: number;
     professionalName: string;
+    professionalEmail?: string;
+    patientId?: string;
+    patientName?: string;
+    patientEmail?: string;
     userType: 'patient' | 'professional';
     onClose: () => void;
     onSuccess: () => void;
@@ -19,7 +25,12 @@ export default function CancelAppointmentModal({
     appointmentId,
     appointmentDate,
     appointmentTime,
+    appointmentDuration,
     professionalName,
+    professionalEmail,
+    patientId,
+    patientName,
+    patientEmail,
     userType,
     onClose,
     onSuccess,
@@ -43,6 +54,35 @@ export default function CancelAppointmentModal({
             const result = await cancelAppointment(appointmentId, userType, reason);
 
             if (result.success) {
+                // Notificar al profesional por email si el paciente cancela
+                if (userType === 'patient' && professionalEmail) {
+                    try {
+                        const user = auth.currentUser;
+                        const token = user ? await user.getIdToken() : null;
+                        if (token) {
+                            await fetch('/api/send-email', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                body: JSON.stringify({
+                                    type: 'patient_cancelled',
+                                    data: {
+                                        patientId: patientId || user?.uid,
+                                        patientName: patientName || 'El paciente',
+                                        patientEmail: patientEmail || '',
+                                        professionalName,
+                                        professionalEmail,
+                                        date: appointmentDate,
+                                        time: appointmentTime,
+                                        duration: appointmentDuration || 50,
+                                        reason: reason || undefined,
+                                    }
+                                })
+                            });
+                        }
+                    } catch (emailErr) {
+                        console.error('Error sending cancellation email to professional:', emailErr);
+                    }
+                }
                 onSuccess();
             } else {
                 setError(result.error || 'Error al cancelar el turno');
@@ -78,11 +118,11 @@ export default function CancelAppointmentModal({
                 {/* Content */}
                 <div className="p-6 space-y-4">
                     {/* Warning */}
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3">
-                        <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                        <div className="text-sm text-amber-900">
-                            <p className="font-semibold mb-1">¿Estás seguro?</p>
-                            <p>Esta acción no se puede deshacer.</p>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
+                        <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                        <div className="text-sm text-red-900">
+                            <p className="font-semibold mb-1">⚠️ Perderás tu seña</p>
+                            <p>Al cancelar un turno, <strong>la seña no es reembolsable</strong>. Si querés cambiar la fecha, usá la opción <strong>Reprogramar</strong> (sin costo hasta 24hs antes).</p>
                         </div>
                     </div>
 

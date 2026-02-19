@@ -1,17 +1,23 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { X, Calendar, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { rescheduleAppointment } from '@/lib/appointments';
 import BookingCalendar from './BookingCalendar';
+import { auth } from '@/lib/firebase';
 
 interface RescheduleAppointmentModalProps {
     appointmentId: string;
     professionalId: string;
     professionalName: string;
+    professionalEmail?: string;
+    patientId?: string;
+    patientName?: string;
+    patientEmail?: string;
     currentDate: string;
     currentTime: string;
+    duration?: number;
     onClose: () => void;
     onSuccess: () => void;
 }
@@ -20,8 +26,13 @@ export default function RescheduleAppointmentModal({
     appointmentId,
     professionalId,
     professionalName,
+    professionalEmail,
+    patientId,
+    patientName,
+    patientEmail,
     currentDate,
     currentTime,
+    duration,
     onClose,
     onSuccess,
 }: RescheduleAppointmentModalProps) {
@@ -29,6 +40,15 @@ export default function RescheduleAppointmentModal({
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
     const [rescheduling, setRescheduling] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Check reschedule policy: only allowed up to 24hs before appointment
+    const canReschedule = (() => {
+        const [year, month, day] = currentDate.split('-').map(Number);
+        const [hours, minutes] = currentTime.split(':').map(Number);
+        const appointmentDateTime = new Date(year, month - 1, day, hours, minutes);
+        const hoursUntil = (appointmentDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
+        return hoursUntil >= 24;
+    })();
 
     const handleReschedule = async () => {
         if (!selectedDate || !selectedTime) {
@@ -44,6 +64,36 @@ export default function RescheduleAppointmentModal({
             const result = await rescheduleAppointment(appointmentId, newDateStr, selectedTime, professionalId);
 
             if (result.success) {
+                // Notificar al profesional por email
+                if (professionalEmail) {
+                    try {
+                        const user = auth.currentUser;
+                        const token = user ? await user.getIdToken() : null;
+                        if (token) {
+                            await fetch('/api/send-email', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                body: JSON.stringify({
+                                    type: 'patient_rescheduled',
+                                    data: {
+                                        patientId: patientId || user?.uid,
+                                        patientName: patientName || 'El paciente',
+                                        patientEmail: patientEmail || '',
+                                        professionalName,
+                                        professionalEmail,
+                                        oldDate: currentDate,
+                                        oldTime: currentTime,
+                                        newDate: newDateStr,
+                                        newTime: selectedTime,
+                                        duration: duration || 50,
+                                    }
+                                })
+                            });
+                        }
+                    } catch (emailErr) {
+                        console.error('Error sending reschedule email to professional:', emailErr);
+                    }
+                }
                 onSuccess();
             } else {
                 setError(result.error || 'Error al reprogramar el turno');
@@ -103,20 +153,37 @@ export default function RescheduleAppointmentModal({
                         </div>
                     </div>
 
-                    {/* New Appointment Selection */}
-                    <div>
-                        <p className="text-sm font-medium text-secondary mb-4">Seleccionar Nueva Fecha y Hora</p>
-                        <BookingCalendar
-                            professionalId={professionalId}
-                            onDateSelect={setSelectedDate}
-                            onTimeSelect={setSelectedTime}
-                            selectedDate={selectedDate}
-                            selectedTime={selectedTime}
-                        />
-                    </div>
+                    {/* Policy Notice */}
+                    {canReschedule ? (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex gap-3">
+                            <div className="text-sm text-green-900">
+                                <p className="font-semibold mb-1">✅ Podés reprogramar sin costo</p>
+                                <p>Las reprogramaciones están permitidas hasta <strong>24 horas antes</strong> del turno, sin perder tu seña.</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
+                            <div className="text-sm text-red-900">
+                                <p className="font-semibold mb-1">⛔ No podés reprogramar este turno</p>
+                                <p>Solo se puede reprogramar con <strong>al menos 24 horas de anticipación</strong>. Para cancelar, contactá directamente al profesional.</p>
+                            </div>
+                        </div>
+                    )}
+                    {canReschedule && (
+                        <div>
+                            <p className="text-sm font-medium text-secondary mb-4">Seleccionar Nueva Fecha y Hora</p>
+                            <BookingCalendar
+                                professionalId={professionalId}
+                                onSelectSlot={(date, time) => {
+                                    setSelectedDate(date);
+                                    setSelectedTime(time);
+                                }}
+                            />
+                        </div>
+                    )}
 
                     {/* New Appointment Summary */}
-                    {selectedDate && selectedTime && (
+                    {canReschedule && selectedDate && selectedTime && (
                         <div className="bg-primary/5 border-2 border-primary/20 rounded-lg p-4">
                             <p className="text-sm font-medium text-primary mb-2">Nuevo Turno</p>
                             <div className="flex items-center gap-4 text-secondary">
@@ -154,7 +221,7 @@ export default function RescheduleAppointmentModal({
                     <Button
                         onClick={handleReschedule}
                         className="flex-1"
-                        disabled={rescheduling || !selectedDate || !selectedTime}
+                        disabled={rescheduling || !selectedDate || !selectedTime || !canReschedule}
                     >
                         {rescheduling ? (
                             <>

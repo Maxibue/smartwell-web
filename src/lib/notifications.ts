@@ -357,3 +357,66 @@ export async function notifyAppointmentReminder(data: {
         },
     });
 }
+
+/**
+ * Notify professional when patient uploads a payment receipt
+ */
+export async function notifyProfessionalPaymentReceived(data: {
+    professionalId: string;
+    patientName: string;
+    appointmentId: string;
+    date: string;
+    time: string;
+}): Promise<void> {
+    await createNotification({
+        userId: data.professionalId,
+        type: 'payment_received',
+        title: '💳 Comprobante de Pago Recibido',
+        message: `${data.patientName} subió el comprobante de seña para el turno del ${data.date} a las ${data.time}. Verificalo en tu panel.`,
+        appointmentId: data.appointmentId,
+        actionUrl: `/panel-profesional`,
+        metadata: {
+            patientName: data.patientName,
+            appointmentDate: data.date,
+            appointmentTime: data.time,
+        },
+    });
+}
+
+/**
+ * Notify patient about payment approval or rejection
+ */
+export async function notifyPatientPaymentResult(data: {
+    patientId: string;
+    professionalName: string;
+    appointmentId: string;
+    date: string;
+    time: string;
+    approved: boolean;
+    isSecondRejection?: boolean;
+}): Promise<void> {
+    const { approved, isSecondRejection } = data;
+    await createNotification({
+        userId: data.patientId,
+        type: approved ? 'appointment_confirmed' : 'appointment_cancelled',
+        title: approved
+            ? '✅ ¡Pago verificado! Turno confirmado'
+            : isSecondRejection
+                ? '❌ Turno cancelado por falta de pago'
+                : '⚠️ Comprobante rechazado — Reintentá',
+        message: approved
+            ? `Tu pago fue verificado por ${data.professionalName}. Tu turno del ${data.date} a las ${data.time} está confirmado.`
+            : isSecondRejection
+                ? `Tu reserva con ${data.professionalName} fue cancelada porque el comprobante no pudo ser verificado.`
+                : `${data.professionalName} no pudo verificar tu comprobante. Tenés un intento más para subir uno correcto.`,
+        appointmentId: data.appointmentId,
+        actionUrl: approved
+            ? '/panel-usuario/turnos'
+            : `/reservar/pago/${data.appointmentId}`,
+        metadata: {
+            professionalName: data.professionalName,
+            appointmentDate: data.date,
+            appointmentTime: data.time,
+        },
+    });
+}

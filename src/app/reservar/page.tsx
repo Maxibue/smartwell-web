@@ -139,31 +139,50 @@ export default function ReservarPage() {
             const meetingRoomName = generateRoomName(tempAppointmentId, professionalId);
             const meetingUrl = generateJitsiUrl(meetingRoomName);
 
-            // Create appointment
+            // Get user data BEFORE creating appointment (needed for patientName/Email in doc)
+            const userDoc = await getDoc(doc(db, "users", userId));
+            const userData = userDoc.data();
+            const patientName = userData?.displayName || userData?.firstName
+                ? (userData?.displayName || `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim())
+                : (userData?.email || 'Usuario');
+            const patientEmail = userData?.email || auth.currentUser?.email || '';
+
+            // Get professional data (email + payment info)
+            const profDoc = await getDoc(doc(db, "professionals", professionalId));
+            const profData = profDoc.data();
+            const mpAlias = profData?.mpAlias || '';
+            const paymentBank = profData?.paymentBank || '';
+            const paymentCbu = profData?.paymentCbu || '';
+            const paymentHolder = profData?.paymentHolder || '';
+            const depositPercent = profData?.depositPercent || 30;
+            const hasDeposit = mpAlias.trim() !== '' || paymentCbu.trim() !== '';
+
+            // Create appointment — si hay alias/CBU, empieza en pending_payment
             const appointmentRef = await addDoc(collection(db, "appointments"), {
                 userId,
                 professionalId,
                 date: dateStr,
                 time: selectedTime,
                 duration: professional.sessionDuration,
-                status: "pending", // Will change to "confirmed" after payment
+                status: hasDeposit ? "pending_payment" : "pending",
                 price: professional.price,
-                paymentStatus: "pending",
+                paymentStatus: hasDeposit ? "awaiting_deposit" : "not_required",
+                depositPercent: hasDeposit ? depositPercent : 0,
+                paymentRejections: 0,
                 createdAt: new Date(),
                 professionalName: `${professional.firstName} ${professional.lastName}`,
                 professionalTitle: professional.title || 'Lic.',
                 professionalSpecialty: professional.specialty,
+                patientName,
+                patientEmail,
                 meetingRoomName,
                 meetingUrl,
+                // Payment Info Snapshot (so it doesn't change if pro changes it later)
+                mpAlias,
+                paymentBank,
+                paymentCbu,
+                paymentHolder
             });
-
-            // Get user data for email
-            const userDoc = await getDoc(doc(db, "users", userId));
-            const userData = userDoc.data();
-
-            // Get professional email
-            const profDoc = await getDoc(doc(db, "professionals", professionalId));
-            const profData = profDoc.data();
 
             // Send confirmation emails (don't block on email sending)
             try {
@@ -176,31 +195,55 @@ export default function ReservarPage() {
                     throw new Error('Authentication required');
                 }
 
-                // Send email to patient
-                await fetch('/api/send-email', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        type: 'patient_confirmation',
-                        data: {
-                            patientId: userId,
-                            patientName: userData?.displayName || userData?.email || 'Usuario',
-                            patientEmail: userData?.email || '',
-                            professionalName: `${professional.title} ${professional.firstName} ${professional.lastName}`,
-                            professionalEmail: profData?.email || '',
-                            date: dateStr,
-                            time: selectedTime,
-                            duration: professional.sessionDuration,
-                            price: professional.price,
-                            meetingLink: `${process.env.NEXT_PUBLIC_APP_URL}/videollamada?appointment=${appointmentRef.id}`,
-                        }
-                    })
-                });
+                // Si hay datos de pago, enviar instrucciones de seña
+                if (hasDeposit) {
+                    await fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            type: 'deposit_instructions',
+                            data: {
+                                patientId: userId,
+                                patientName,
+                                patientEmail,
+                                professionalName: `${professional.title} ${professional.firstName} ${professional.lastName}`,
+                                date: dateStr,
+                                time: selectedTime,
+                                duration: professional.sessionDuration,
+                                sessionPrice: professional.price,
+                                depositPercent,
+                                mpAlias,
+                                paymentBank,
+                                paymentCbu,
+                                paymentHolder,
+                                appointmentId: appointmentRef.id,
+                            }
+                        })
+                    });
+                } else {
+                    // Sin alias: flujo normal de confirmación
+                    await fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            type: 'patient_confirmation',
+                            data: {
+                                patientId: userId,
+                                patientName,
+                                patientEmail,
+                                professionalName: `${professional.title} ${professional.firstName} ${professional.lastName}`,
+                                professionalEmail: profData?.email || '',
+                                date: dateStr,
+                                time: selectedTime,
+                                duration: professional.sessionDuration,
+                                price: professional.price,
+                                meetingLink: `${process.env.NEXT_PUBLIC_APP_URL}/videollamada?appointment=${appointmentRef.id}`,
+                            }
+                        })
+                    });
+                }
 
-                // Send email to professional
+                // Send email to professional (patientId is used for auth check since the patient is the logged-in user)
                 await fetch('/api/send-email', {
                     method: 'POST',
                     headers: {
@@ -210,9 +253,9 @@ export default function ReservarPage() {
                     body: JSON.stringify({
                         type: 'professional_notification',
                         data: {
-                            professionalId: professionalId,
-                            patientName: userData?.displayName || userData?.email || 'Usuario',
-                            patientEmail: userData?.email || '',
+                            patientId: userId,   // ← auth check: el paciente es quien hace la request
+                            patientName,
+                            patientEmail,
                             professionalName: `${professional.title} ${professional.firstName} ${professional.lastName}`,
                             professionalEmail: profData?.email || '',
                             date: dateStr,
@@ -230,7 +273,6 @@ export default function ReservarPage() {
 
             // Send in-app notifications
             try {
-                const patientName = userData?.displayName || userData?.email || 'Usuario';
                 const professionalName = `${professional.firstName} ${professional.lastName}`;
 
                 // Notify Professional

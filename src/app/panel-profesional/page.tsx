@@ -19,16 +19,21 @@ import Link from "next/link";
 // Estructura unificada para bookings y appointments
 interface Session {
     id: string;
-    source: "booking" | "appointment"; // de qué colección viene
+    source: "booking" | "appointment";
     patientName: string;
     patientEmail: string;
+    patientId?: string;
     service: string;
     price: number;
-    date: string;       // YYYY-MM-DD
-    time: string;       // HH:mm
-    duration: number;   // minutos
+    date: string;
+    time: string;
+    duration: number;
     status: string;
     notes?: string;
+    meetingUrl?: string;
+    receiptUrl?: string;
+    paymentRejections?: number;
+    depositPercent?: number;
 }
 
 interface ProfessionalProfile {
@@ -115,6 +120,9 @@ export default function ProfessionalDashboard() {
     const [savingLink, setSavingLink] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [openStatusId, setOpenStatusId] = useState<string | null>(null);
+    const [reviewingId, setReviewingId] = useState<string | null>(null);
+    const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
+    const [showRejectInput, setShowRejectInput] = useState<string | null>(null);
 
     // ── Carga de datos ──────────────────────────────────────────────────────
     const fetchData = async (uid: string) => {
@@ -149,6 +157,7 @@ export default function ProfessionalDashboard() {
                         source: "booking",
                         patientName: data.user?.name || data.patientName || "Paciente",
                         patientEmail: data.user?.email || data.patientEmail || "",
+                        patientId: data.userId || "",
                         service: data.serviceName || data.service || "Consulta",
                         price: data.servicePrice || data.price || 0,
                         date: data.date || "",
@@ -156,6 +165,7 @@ export default function ProfessionalDashboard() {
                         duration: data.duration || 50,
                         status: data.status || "pending",
                         notes: data.notes || "",
+                        meetingUrl: data.meetingUrl || "",
                     });
                 });
             } catch (e) { console.warn("bookings:", e); }
@@ -172,6 +182,7 @@ export default function ProfessionalDashboard() {
                         source: "appointment",
                         patientName: data.patientName || "Paciente",
                         patientEmail: data.patientEmail || "",
+                        patientId: data.userId || "",
                         service: data.service || "Consulta",
                         price: data.price || prof.price || 0,
                         date: data.date || "",
@@ -179,6 +190,10 @@ export default function ProfessionalDashboard() {
                         duration: data.duration || 60,
                         status: data.status || "confirmed",
                         notes: data.notes || "",
+                        meetingUrl: data.meetingUrl || "",
+                        receiptUrl: data.receiptUrl || "",
+                        paymentRejections: data.paymentRejections || 0,
+                        depositPercent: data.depositPercent || 0,
                     });
                 });
             } catch (e) { console.warn("appointments:", e); }
@@ -227,6 +242,48 @@ export default function ProfessionalDashboard() {
         try {
             const col = session.source === "booking" ? "bookings" : "appointments";
             await updateDoc(doc(db, col, session.id), { status: newStatus });
+
+            // Enviar email al paciente cuando el profesional confirma o cancela
+            if ((newStatus === "confirmed" || newStatus === "cancelled") && session.patientEmail) {
+                try {
+                    const token = await user.getIdToken();
+                    const profDoc = await getDoc(doc(db, "professionals", user.uid));
+                    const profData = profDoc.data();
+                    const professionalName = profData
+                        ? `${profData.title || ''} ${profData.firstName || ''} ${profData.lastName || ''}`.trim()
+                        : profile?.name || user.displayName || "Profesional";
+
+                    const emailType = newStatus === "confirmed" ? "appointment_confirmed" : "appointment_cancelled";
+
+                    await fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            type: emailType,
+                            data: {
+                                professionalId: user.uid,
+                                patientName: session.patientName,
+                                patientEmail: session.patientEmail,
+                                professionalName,
+                                professionalEmail: profData?.email || user.email || '',
+                                date: session.date,
+                                time: session.time,
+                                duration: session.duration,
+                                price: session.price,
+                                meetingLink: session.meetingUrl || '',
+                            }
+                        })
+                    });
+                    console.log(`Email ${emailType} sent to patient:`, session.patientEmail);
+                } catch (emailErr) {
+                    // No bloquear la acción si falla el email
+                    console.error('Error sending status email:', emailErr);
+                }
+            }
+
             await fetchData(user.uid);
         } catch (e) {
             console.error(e);
@@ -247,6 +304,7 @@ export default function ProfessionalDashboard() {
     );
     const confirmedSessions = sessions.filter((s) => s.status === "confirmed");
     const pendingSessions = sessions.filter((s) => s.status === "pending");
+    const paymentPendingSessions = sessions.filter((s) => s.status === "payment_submitted");
     const now = nowInBA();
     const monthRevenue = sessions
         .filter((s) => {
@@ -381,6 +439,127 @@ export default function ProfessionalDashboard() {
                     </div>
                 ))}
             </div>
+
+            {/* ── Comprobantes Pendientes de Revisión ──────────────────────── */}
+            {paymentPendingSessions.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                            <span className="text-base">💳</span>
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-amber-900">
+                                Comprobantes Pendientes
+                                <span className="ml-2 text-xs font-semibold bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
+                                    {paymentPendingSessions.length}
+                                </span>
+                            </h3>
+                            <p className="text-xs text-amber-700">Revisá y verificá los pagos de seña antes de confirmar los turnos.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        {paymentPendingSessions.map((s) => {
+                            const depositAmount = Math.round(s.price * (s.depositPercent || 30) / 100);
+                            const isProcessing = reviewingId === s.id;
+                            const showReject = showRejectInput === s.id;
+
+                            return (
+                                <div key={s.id} className="bg-white rounded-xl border border-amber-200 p-4 space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-semibold text-secondary">{s.patientName}</p>
+                                            <p className="text-xs text-text-secondary">
+                                                {s.date} · {s.time} hs · Seña: ${depositAmount.toLocaleString('es-AR')}
+                                            </p>
+                                            {(s.paymentRejections ?? 0) >= 1 && (
+                                                <span className="text-xs font-semibold text-red-600">⚠️ Segundo intento</span>
+                                            )}
+                                        </div>
+                                        {s.receiptUrl && (
+                                            <a
+                                                href={s.receiptUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex-shrink-0 text-amber-700 hover:text-amber-900 text-xs font-semibold border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-50 transition-colors"
+                                            >
+                                                🔍 Ver comprobante
+                                            </a>
+                                        )}
+                                    </div>
+
+                                    {showReject && (
+                                        <div className="space-y-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Motivo del rechazo (opcional)"
+                                                value={rejectionReason[s.id] || ''}
+                                                onChange={(e) => setRejectionReason(prev => ({ ...prev, [s.id]: e.target.value }))}
+                                                className="w-full text-sm border border-neutral-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            disabled={isProcessing}
+                                            onClick={async () => {
+                                                setReviewingId(s.id);
+                                                try {
+                                                    const token = await user!.getIdToken();
+                                                    await fetch('/api/review-payment', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                                        body: JSON.stringify({ appointmentId: s.id, action: 'approve' }),
+                                                    });
+                                                    await fetchData(user!.uid);
+                                                } catch (e) { console.error(e); }
+                                                finally { setReviewingId(null); }
+                                            }}
+                                            className="flex-1 bg-emerald-500 text-white text-sm font-semibold rounded-lg px-3 py-2 hover:bg-emerald-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                                        >
+                                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                            Aprobar
+                                        </button>
+
+                                        {showReject ? (
+                                            <button
+                                                disabled={isProcessing}
+                                                onClick={async () => {
+                                                    setReviewingId(s.id);
+                                                    try {
+                                                        const token = await user!.getIdToken();
+                                                        await fetch('/api/review-payment', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                                            body: JSON.stringify({ appointmentId: s.id, action: 'reject', rejectionReason: rejectionReason[s.id] || '' }),
+                                                        });
+                                                        setShowRejectInput(null);
+                                                        await fetchData(user!.uid);
+                                                    } catch (e) { console.error(e); }
+                                                    finally { setReviewingId(null); }
+                                                }}
+                                                className="flex-1 bg-red-500 text-white text-sm font-semibold rounded-lg px-3 py-2 hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                                                Confirmar Rechazo
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowRejectInput(s.id)}
+                                                className="flex-1 bg-white text-red-600 border border-red-200 text-sm font-semibold rounded-lg px-3 py-2 hover:bg-red-50 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <X className="h-4 w-4" />
+                                                Rechazar
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Main Grid */}
             <div className="grid lg:grid-cols-3 gap-6">

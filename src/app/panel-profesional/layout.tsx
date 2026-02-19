@@ -30,6 +30,7 @@ const sidebarItems = [
     { icon: BarChart3, label: "Estadísticas", href: "/panel-profesional/estadisticas" },
     { icon: Users, label: "Pacientes", href: "/panel-profesional/pacientes" },
     { icon: Settings, label: "Mis Servicios", href: "/panel-profesional/servicios" },
+    { icon: CreditCard, label: "Cobros", href: "/panel-profesional/pagos" },
     { icon: UserCircle, label: "Mi Perfil", href: "/panel-profesional/perfil" },
 ];
 

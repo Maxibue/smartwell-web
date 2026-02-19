@@ -25,6 +25,8 @@ interface ProfessionalProfile {
     image: string;
     status?: "pending" | "under_review" | "approved" | "rejected";
     tags?: string[];
+    mpAlias?: string;       // alias de MercadoPago
+    depositPercent?: string; // % de seña (ej: "30")
 }
 
 interface Service {
@@ -62,7 +64,9 @@ export default function ProfilePage() {
         duration: "50",
         image: "",
         status: "pending",
-        tags: []
+        tags: [],
+        mpAlias: "",
+        depositPercent: "30",
     });
 
     useEffect(() => {
@@ -86,7 +90,9 @@ export default function ProfilePage() {
                             duration: data.duration?.toString() || "50",
                             image: data.image || data.profileImage || "",
                             status: data.status || "pending",
-                            tags: data.tags || []
+                            tags: data.tags || [],
+                            mpAlias: data.mpAlias || "",
+                            depositPercent: data.depositPercent?.toString() || "30",
                         });
                         // Cargar servicios guardados
                         if (Array.isArray(data.services) && data.services.length > 0) {
@@ -178,6 +184,8 @@ export default function ProfilePage() {
                 price: baseService.price,
                 duration: baseService.duration,
                 image: sanitizedImage,
+                mpAlias: (profile.mpAlias || '').trim(),
+                depositPercent: Math.min(100, Math.max(0, Number(profile.depositPercent) || 30)),
                 updatedAt: new Date()
             });
 
@@ -529,7 +537,64 @@ export default function ProfilePage() {
                         </div>
                     </div>
 
+                    {/* ── Cobro de Seña ─────────────────────────────────────── */}
+                    <div className="bg-white rounded-xl border border-neutral-100 shadow-sm p-6 space-y-5">
+                        <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-base">💳</span>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-secondary text-base">Cobro de Seña</h3>
+                                <p className="text-sm text-text-secondary mt-0.5">
+                                    Los pacientes recibirán tu alias de MercadoPago para pagar la seña al reservar.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="mpAlias">Alias de MercadoPago</Label>
+                                <Input
+                                    id="mpAlias"
+                                    value={profile.mpAlias || ''}
+                                    onChange={(e) => handleChange('mpAlias', e.target.value)}
+                                    placeholder="Ej: juan.perez.mp"
+                                />
+                                <p className="text-xs text-text-muted">Tu alias de transferencia en MercadoPago o CBU.</p>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="depositPercent">% de Seña Requerido</Label>
+                                <div className="relative">
+                                    <Input
+                                        id="depositPercent"
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={profile.depositPercent || '30'}
+                                        onChange={(e) => handleChange('depositPercent', e.target.value)}
+                                        className="pr-10"
+                                        placeholder="30"
+                                    />
+                                    <span className="absolute right-3 top-2.5 text-sm font-semibold text-neutral-500">%</span>
+                                </div>
+                                <p className="text-xs text-text-muted">Porcentaje del total de la sesión que se cobra como seña.</p>
+                            </div>
+                        </div>
+
+                        {profile.mpAlias && profile.depositPercent && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-800">
+                                ✅ Configurado: los pacientes verán que deben enviar el <strong>{profile.depositPercent}%</strong> de la sesión al alias <strong>{profile.mpAlias}</strong>.
+                            </div>
+                        )}
+                        {!profile.mpAlias && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                                ⚠️ Sin alias configurado: los pacientes podrán reservar pero no recibirán instrucciones de pago de seña.
+                            </div>
+                        )}
+                    </div>
+
                     <div className="flex flex-col md:flex-row gap-3 justify-end pt-4">
+
                         <Button type="submit" size="lg" disabled={saving} className="w-full md:w-auto min-w-[200px]">
                             {saving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-5 w-5 mr-2" />}
                             {saving ? "Guardando..." : "Guardar Cambios"}

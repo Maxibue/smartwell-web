@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendPatientConfirmationEmail, sendProfessionalNotificationEmail } from '@/lib/email';
+import {
+    sendPatientConfirmationEmail,
+    sendProfessionalNotificationEmail,
+    sendAppointmentConfirmedToPatient,
+    sendAppointmentCancelledToPatient,
+    sendPatientCancelledToProfessional,
+    sendPatientRescheduledToProfessional,
+} from '@/lib/email';
+import {
+    sendDepositInstructionsToPatient,
+    sendPaymentRejectedToPatient,
+    sendPaymentApprovedToPatient,
+} from '@/lib/email-deposit';
 import { verifyAuth, unauthorizedResponse } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
@@ -22,14 +34,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // ✅ SEGURIDAD: Verificar que el usuario autenticado es el que envía el email
-        // o es un admin/profesional autorizado
         const userId = authResult.user?.uid;
 
-        // Validar que el usuario tiene permiso para enviar este tipo de email
         switch (type) {
             case 'patient_confirmation':
-                // Verificar que el paciente es el usuario autenticado
+                // El paciente (userId) reserva su propio turno → puede enviar ambos emails
                 if (data.patientId && data.patientId !== userId) {
                     return NextResponse.json(
                         { error: 'Unauthorized: Cannot send email for another user' },
@@ -40,14 +49,92 @@ export async function POST(request: NextRequest) {
                 break;
 
             case 'professional_notification':
-                // Verificar que el profesional es el usuario autenticado
+                // El paciente (userId) reserva → notifica al profesional
+                // La verificación es que el patientId coincide con el usuario autenticado
+                if (data.patientId && data.patientId !== userId) {
+                    return NextResponse.json(
+                        { error: 'Unauthorized: Cannot send notification as another user' },
+                        { status: 403 }
+                    );
+                }
+                await sendProfessionalNotificationEmail(data);
+                break;
+
+            case 'appointment_confirmed':
+                // El profesional (userId) confirma un turno → notifica al paciente
                 if (data.professionalId && data.professionalId !== userId) {
+                    return NextResponse.json(
+                        { error: 'Unauthorized: Only the professional can confirm appointments' },
+                        { status: 403 }
+                    );
+                }
+                await sendAppointmentConfirmedToPatient(data);
+                break;
+
+            case 'appointment_cancelled':
+                // El profesional (userId) cancela un turno → notifica al paciente
+                if (data.professionalId && data.professionalId !== userId) {
+                    return NextResponse.json(
+                        { error: 'Unauthorized: Only the professional can cancel appointments' },
+                        { status: 403 }
+                    );
+                }
+                await sendAppointmentCancelledToPatient(data);
+                break;
+
+            case 'patient_cancelled':
+                // El paciente (userId) cancela su propio turno → avisa al profesional
+                if (data.patientId && data.patientId !== userId) {
                     return NextResponse.json(
                         { error: 'Unauthorized: Cannot send email for another user' },
                         { status: 403 }
                     );
                 }
-                await sendProfessionalNotificationEmail(data);
+                await sendPatientCancelledToProfessional(data);
+                break;
+
+            case 'patient_rescheduled':
+                // El paciente (userId) reagenda su propio turno → avisa al profesional
+                if (data.patientId && data.patientId !== userId) {
+                    return NextResponse.json(
+                        { error: 'Unauthorized: Cannot send email for another user' },
+                        { status: 403 }
+                    );
+                }
+                await sendPatientRescheduledToProfessional(data);
+                break;
+
+            case 'deposit_instructions':
+                // El paciente reserva → recibe instrucciones de pago de seña
+                if (data.patientId && data.patientId !== userId) {
+                    return NextResponse.json(
+                        { error: 'Unauthorized: Cannot send email for another user' },
+                        { status: 403 }
+                    );
+                }
+                await sendDepositInstructionsToPatient(data);
+                break;
+
+            case 'payment_rejected':
+                // El profesional rechaza un comprobante → avisa al paciente
+                if (data.professionalId && data.professionalId !== userId) {
+                    return NextResponse.json(
+                        { error: 'Unauthorized: Only the professional can reject payments' },
+                        { status: 403 }
+                    );
+                }
+                await sendPaymentRejectedToPatient(data);
+                break;
+
+            case 'payment_approved':
+                // El profesional aprueba el pago → turno confirmado, avisa al paciente
+                if (data.professionalId && data.professionalId !== userId) {
+                    return NextResponse.json(
+                        { error: 'Unauthorized: Only the professional can approve payments' },
+                        { status: 403 }
+                    );
+                }
+                await sendPaymentApprovedToPatient(data);
                 break;
 
             default:

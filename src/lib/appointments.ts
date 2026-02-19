@@ -10,7 +10,7 @@ import {
     notifyAppointmentRescheduled
 } from './notifications';
 
-export type AppointmentStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'pending_payment' | 'payment_submitted' | 'payment_rejected';
 
 export interface CancellationPolicy {
     canCancel: boolean;
