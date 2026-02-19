@@ -79,6 +79,13 @@ export function Navbar() {
         }
     };
 
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    // Close mobile menu when route changes
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [router]);
+
     return (
         <header className="sticky top-0 z-50 w-full border-b bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/60">
             <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
@@ -95,7 +102,7 @@ export function Navbar() {
                     )}
                 </nav>
 
-                {/* Actions */}
+                {/* Desktop Actions */}
                 <div className="hidden md:flex items-center gap-4">
                     {loading ? (
                         <div className="w-20 h-10 bg-neutral-100 animate-pulse rounded-lg"></div>
@@ -125,10 +132,81 @@ export function Navbar() {
                 </div>
 
                 {/* Mobile Menu Trigger */}
-                <button className="md:hidden p-2 text-secondary">
-                    <Menu className="h-6 w-6" />
+                <button
+                    className="md:hidden p-2 text-secondary hover:bg-neutral-100 rounded-lg transition-colors"
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                >
+                    {isMobileMenuOpen ? <LogOut className="h-6 w-6 rotate-45" /> : <Menu className="h-6 w-6" />}
                 </button>
             </div>
+
+            {/* Mobile Menu Overlay */}
+            {isMobileMenuOpen && (
+                <div className="absolute top-16 left-0 w-full bg-white border-b shadow-lg md:hidden animate-in slide-in-from-top-2 z-40">
+                    <div className="flex flex-col p-4 gap-4">
+                        <Link
+                            href="/como-funciona"
+                            className="p-3 hover:bg-neutral-50 rounded-lg text-secondary font-medium transition-colors"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            Cómo funciona
+                        </Link>
+                        <Link
+                            href="/profesionales"
+                            className="p-3 hover:bg-neutral-50 rounded-lg text-secondary font-medium transition-colors"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                            Profesionales
+                        </Link>
+                        {!user && (
+                            <Link
+                                href="/para-profesionales"
+                                className="p-3 hover:bg-neutral-50 rounded-lg text-secondary font-medium transition-colors"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                                Soy Profesional
+                            </Link>
+                        )}
+
+                        <div className="h-px bg-neutral-100 my-2" />
+
+                        {user ? (
+                            <>
+                                <Link
+                                    href={getDashboardLink()}
+                                    className="p-3 bg-primary/5 rounded-lg text-primary font-bold text-center border border-primary/10"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    {getDashboardLabel()}
+                                </Link>
+                                <button
+                                    onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
+                                    className="p-3 text-red-600 font-medium text-center hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                    Cerrar Sesión
+                                </button>
+                            </>
+                        ) : (
+                            <div className="flex flex-col gap-3">
+                                <Link
+                                    href="/login"
+                                    className="p-3 text-center font-medium bg-neutral-50 hover:bg-neutral-100 rounded-lg text-secondary border border-neutral-200"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    Ingresar
+                                </Link>
+                                <Link
+                                    href="/comenzar"
+                                    className="p-3 text-center font-bold bg-primary text-white hover:bg-primary/90 rounded-lg shadow-sm shadow-primary/20"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    Buscar Profesional
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </header>
     );
 }
