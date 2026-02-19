@@ -103,28 +103,27 @@ export default function Home() {
           <div className="container px-4 md:px-6 mx-auto relative z-10">
             <div className="text-center max-w-2xl mx-auto mb-16">
               <span className="text-primary font-semibold tracking-wider text-sm uppercase mb-2 block">El proceso</span>
-              <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-4">Tu bienestar, simplificado</h2>
-              <p className="text-text-secondary text-lg">Un camino claro y directo para conectar con el profesional que necesitás.</p>
+              <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-4">Encontrar apoyo profesional es más simple de lo que pensás.</h2>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
               {[
                 {
                   icon: <HeartHandshake className="h-8 w-8 text-white" />,
-                  title: "1. Contanos qué te pasa",
-                  desc: "Completá un breve cuestionario, 100% confidencial, para entender mejor qué tipo de acompañamiento buscás.",
+                  title: "1. Elegí tu especialidad",
+                  desc: "Explorá profesionales validados según lo que necesitás hoy.",
                   color: "bg-primary"
                 },
                 {
                   icon: <Star className="h-8 w-8 text-white" />,
-                  title: "2. Matching Inteligente",
-                  desc: "Nuestro equipo (humanos, no robots) selecciona a los profesionales ideales para tu situación específica.",
+                  title: "2. Agendá tu sesión",
+                  desc: "Reservá en pocos pasos, de forma segura y confidencial.",
                   color: "bg-accent"
                 },
                 {
                   icon: <CheckCircle2 className="h-8 w-8 text-white" />,
-                  title: "3. Conectá y comenzá",
-                  desc: "Elegí el profesional que más te resuene, agendá tu primer encuentro y empezá tu proceso.",
+                  title: "3. Iniciá tu proceso",
+                  desc: "Conectate con el profesional adecuado y empezá tu acompañamiento.",
                   color: "bg-secondary"
                 }
               ].map((feature, i) => (
