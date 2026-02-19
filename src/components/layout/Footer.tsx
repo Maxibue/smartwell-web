@@ -32,7 +32,7 @@ export function Footer() {
                         <h4 className="text-sm font-semibold text-secondary uppercase tracking-wider">Plataforma</h4>
                         <ul className="space-y-2 text-sm text-text-secondary">
                             <li><Link href="/comenzar" className="hover:text-primary">Buscar Profesional</Link></li>
-                            <li><Link href="/como-funciona" className="hover:text-primary">Cómo funciona</Link></li>
+                            <li><Link href="/profesionales" className="hover:text-primary">Profesionales</Link></li>
                             <li><Link href="/blog" className="hover:text-primary">Blog</Link></li>
                         </ul>
                     </div>

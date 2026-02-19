@@ -95,7 +95,6 @@ export function Navbar() {
 
                 {/* Desktop Navigation */}
                 <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-text-secondary">
-                    <Link href="/como-funciona" className="hover:text-primary transition-colors">Cómo funciona</Link>
                     <Link href="/profesionales" className="hover:text-primary transition-colors">Profesionales</Link>
                     {!user && (
                         <Link href="/para-profesionales" className="hover:text-primary transition-colors">Soy Profesional</Link>
@@ -144,13 +143,7 @@ export function Navbar() {
             {isMobileMenuOpen && (
                 <div className="absolute top-16 left-0 w-full bg-white border-b shadow-lg md:hidden animate-in slide-in-from-top-2 z-40">
                     <div className="flex flex-col p-4 gap-4">
-                        <Link
-                            href="/como-funciona"
-                            className="p-3 hover:bg-neutral-50 rounded-lg text-secondary font-medium transition-colors"
-                            onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                            Cómo funciona
-                        </Link>
+
                         <Link
                             href="/profesionales"
                             className="p-3 hover:bg-neutral-50 rounded-lg text-secondary font-medium transition-colors"
