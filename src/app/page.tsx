@@ -146,25 +146,21 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {[
                 {
-                  emoji: "🧠",
                   area: "Salud Mental",
                   sub: "Psicología clínica, ansiedad, estrés y terapia de pareja.",
                   href: "/profesionales?area=salud-mental",
                 },
                 {
-                  emoji: "🥗",
                   area: "Nutrición",
                   sub: "Nutrición deportiva y alimentación consciente.",
                   href: "/profesionales?area=nutricion",
                 },
                 {
-                  emoji: "👶",
                   area: "Maternidad y Familia",
                   sub: "Lactancia, sueño infantil y acompañamiento familiar.",
                   href: "/profesionales?area=maternidad",
                 },
                 {
-                  emoji: "🚀",
                   area: "Desarrollo y Carrera",
                   sub: "Coaching, liderazgo y desarrollo profesional.",
                   href: "/profesionales?area=desarrollo",
@@ -176,7 +172,6 @@ export default function Home() {
                   className="group flex flex-col justify-between p-7 bg-white border border-neutral-200 rounded-2xl hover:border-neutral-400 hover:shadow-lg transition-all duration-200"
                 >
                   <div>
-                    <span className="text-2xl mb-4 block">{card.emoji}</span>
                     <h3 className="text-xl font-bold text-secondary font-display mb-2">{card.area}</h3>
                     <p className="text-sm text-text-secondary leading-relaxed">{card.sub}</p>
                   </div>
