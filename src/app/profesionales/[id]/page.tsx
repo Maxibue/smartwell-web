@@ -68,49 +68,6 @@ export default function ProfessionalProfile({ params }: { params: { id: string }
 
     const loadProfessional = async () => {
         try {
-            // Check for mock IDs first
-            if (params.id.startsWith("mock")) {
-                // Mock Data Fallback
-                const mockData: Record<string, Professional> = {
-                    "mock1": {
-                        firstName: "Mariana",
-                        lastName: "Costa",
-                        title: "Lic.",
-                        specialty: "Psicóloga Clínica",
-                        category: "Salud Mental",
-                        categories: ["salud-mental"],
-                        bio: "Especialista en terapia cognitivo-conductual con más de 10 años de experiencia.",
-                        price: 45000,
-                        sessionDuration: 50,
-                        profileImage: "https://i.pravatar.cc/150?u=mock_psy",
-                        rating: 4.9,
-                        reviewCount: 32,
-                        status: "approved"
-                    },
-                    "mock2": {
-                        firstName: "Lucas",
-                        lastName: "Funes",
-                        title: "Lic.",
-                        specialty: "Nutricionista Deportivo",
-                        category: "Nutrición",
-                        categories: ["nutricion-integral"],
-                        bio: "Ayudo a deportistas a alcanzar su máximo rendimiento a través de la alimentación.",
-                        price: 35000,
-                        sessionDuration: 50,
-                        profileImage: "https://i.pravatar.cc/150?u=mock_nutri",
-                        rating: 4.8,
-                        reviewCount: 18,
-                        status: "approved"
-                    }
-                };
-
-                if (mockData[params.id]) {
-                    setProfessional(mockData[params.id]);
-                }
-                setLoading(false);
-                return;
-            }
-
             const profDoc = await getDoc(doc(db, "professionals", params.id));
             if (profDoc.exists()) {
                 const data = profDoc.data();
