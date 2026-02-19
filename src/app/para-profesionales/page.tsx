@@ -3,7 +3,7 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
-import { CheckCircle, Calendar, Users, ShieldCheck, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle, Calendar, Users, ShieldCheck, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -25,30 +25,22 @@ export default function ProfessionalLandingPage() {
                                 RED PROFESIONAL
                             </div>
                             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold font-display tracking-tight text-secondary leading-[1.15]">
-                                Formá parte de la Red Profesional Validada de Bienestar en LATAM.
+                                Formá parte de una red profesional validada en Latinoamérica.
                             </h1>
                             <p className="text-lg md:text-xl text-text-secondary leading-relaxed">
-                                Conectamos especialistas en salud mental, nutrición y desarrollo humano con personas que buscan acompañamiento real y confiable.
+                                Conectamos profesionales comprometidos con personas que buscan acompañamiento real, confidencial y de calidad.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4 pt-4">
                                 <Button
-                                    className="bg-primary hover:bg-primary-active text-white text-lg px-8 h-14 rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all transform hover:-translate-y-0.5 tracking-wide uppercase font-semibold"
+                                    className="bg-primary hover:bg-primary-active text-white text-lg px-8 h-14 rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all transform hover:-translate-y-0.5 font-semibold"
                                     asChild
                                 >
                                     <Link href="/postulacion">
-                                        POSTULARME A LA RED
-                                    </Link>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className="text-secondary border-2 border-secondary/20 hover:bg-neutral-50 h-14 px-8 rounded-xl text-lg font-semibold tracking-wide uppercase"
-                                    asChild
-                                >
-                                    <Link href="#proceso-seleccion">
-                                        CONOCER EL PROCESO
+                                        Aplicar para formar parte <ArrowRight className="ml-2 h-5 w-5 inline" />
                                     </Link>
                                 </Button>
                             </div>
+                            <p className="text-sm text-text-muted">Proceso de validación activo.</p>
                         </div>
                         <div className="relative h-[500px] w-full max-w-[520px] mx-auto lg:mx-0 rounded-3xl overflow-hidden shadow-2xl border-4 border-white transform transition-transform hover:scale-[1.01] duration-500">
                             <Image
@@ -58,140 +50,109 @@ export default function ProfessionalLandingPage() {
                                 className="object-cover bg-neutral-50"
                                 priority
                             />
-                            {/* Decorative blob background (matching Home) */}
-                            <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl opacity-50 pointer-events-none -z-10"></div>
-                            <div className="absolute -bottom-24 -left-12 w-80 h-80 bg-secondary/5 rounded-full blur-3xl opacity-50 pointer-events-none -z-10"></div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* --- QUÉ ES SMARTWELL --- */}
-            <section className="py-24 bg-background relative overflow-hidden">
-                <div className="container mx-auto px-4 md:px-6 max-w-4xl text-center space-y-8 relative z-10">
-                    <span className="text-primary font-semibold tracking-wider text-sm uppercase mb-2 block">CURADURÍA Y CONFIANZA</span>
-                    <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary">
-                        No somos un directorio. Somos una red seleccionada.
-                    </h2>
-                    <div className="space-y-6 text-lg text-text-secondary leading-relaxed">
-                        <p>
-                            SmartWell es una plataforma tecnológica que conecta personas con profesionales del bienestar cuidadosamente validados.
-                        </p>
-                        <p className="font-medium text-primary">
-                            Priorizamos calidad, ética y experiencia.
-                        </p>
-                        <p>
-                            Cada profesional pasa por un proceso de revisión antes de ser activado.
-                            Nuestro objetivo no es volumen. Es confianza.
-                        </p>
-                    </div>
-                </div>
-            </section>
-
-            {/* --- BENEFICIOS --- */}
-            <section className="py-24 bg-white">
+            {/* --- ¿POR QUÉ SMARTWELL? --- */}
+            <section className="py-24 bg-neutral-50">
                 <div className="container mx-auto px-4 md:px-6">
                     <div className="text-center max-w-2xl mx-auto mb-16">
-                        <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-4">Beneficios de sumarte</h2>
+                        <span className="text-primary font-semibold tracking-wider text-sm uppercase mb-2 block">Red validada</span>
+                        <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-4">¿Por qué elegir SmartWell?</h2>
                     </div>
-                    <div className="grid md:grid-cols-3 gap-12">
-                        {/* Benefit 1 */}
-                        <div className="flex flex-col items-start space-y-4 p-8 rounded-2xl border border-neutral-100 shadow-sm hover:shadow-xl transition-all duration-300 group bg-white">
-                            <div className="p-4 bg-primary/10 text-primary rounded-xl mb-2 group-hover:scale-110 transition-transform duration-300">
-                                <Users className="h-8 w-8" />
+                    <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                        {[
+                            {
+                                icon: <Users className="h-7 w-7" />,
+                                color: "bg-primary/10 text-primary",
+                                title: "Pacientes que valoran procesos profesionales",
+                                desc: "Llegamos a personas que buscan un acompañamiento serio, no una consulta de emergencia. Pacientes comprometidos con su proceso."
+                            },
+                            {
+                                icon: <ShieldCheck className="h-7 w-7" />,
+                                color: "bg-secondary/10 text-secondary",
+                                title: "Posicionamiento dentro de una red validada",
+                                desc: "Formar parte de SmartWell es una distinción. Tu presencia en la red comunica estándar, experiencia y compromiso ético."
+                            },
+                            {
+                                icon: <Calendar className="h-7 w-7" />,
+                                color: "bg-accent/10 text-accent",
+                                title: "Matching estratégico, no masivo",
+                                desc: "No somos un directorio abierto. Hacemos conexiones con criterio, priorizando calidad de vínculo sobre cantidad de consultas."
+                            },
+                            {
+                                icon: <CheckCircle className="h-7 w-7" />,
+                                color: "bg-indigo-50 text-indigo-600",
+                                title: "Confidencialidad y estándar ético",
+                                desc: "Operamos bajo un marco de confidencialidad estricto. Cada interacción dentro de la plataforma respeta tu práctica y la del paciente."
+                            }
+                        ].map((b, i) => (
+                            <div key={i} className="flex items-start gap-5 p-8 rounded-2xl border border-neutral-100 shadow-sm hover:shadow-xl transition-all duration-300 bg-white group">
+                                <div className={`p-3 rounded-xl shrink-0 group-hover:scale-110 transition-transform duration-300 ${b.color}`}>
+                                    {b.icon}
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-secondary font-display mb-2">{b.title}</h3>
+                                    <p className="text-text-secondary leading-relaxed text-sm">{b.desc}</p>
+                                </div>
                             </div>
-                            <h3 className="text-xl font-bold text-secondary font-display">Más visibilidad profesional</h3>
-                            <p className="text-text-secondary leading-relaxed">
-                                Conectamos con personas que ya están buscando acompañamiento calificado, reduciendo tu esfuerzo en marketing.
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* --- NUESTRO ESTÁNDAR PROFESIONAL --- */}
+            <section className="py-24 bg-white">
+                <div className="container mx-auto px-4 md:px-6 max-w-4xl">
+                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                        <div className="space-y-6">
+                            <span className="text-primary font-semibold tracking-wider text-sm uppercase block">Estándar SmartWell</span>
+                            <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary">Nuestro estándar profesional</h2>
+                            <p className="text-text-secondary text-lg leading-relaxed">
+                                SmartWell no es un directorio abierto.<br />
+                                Cada profesional pasa por un proceso de validación para asegurar calidad, experiencia y compromiso.
                             </p>
                         </div>
-
-                        {/* Benefit 2 */}
-                        <div className="flex flex-col items-start space-y-4 p-8 rounded-2xl border border-neutral-100 shadow-sm hover:shadow-xl transition-all duration-300 group bg-white">
-                            <div className="p-4 bg-accent/10 text-accent rounded-xl mb-2 group-hover:scale-110 transition-transform duration-300">
-                                <Calendar className="h-8 w-8" />
-                            </div>
-                            <h3 className="text-xl font-bold text-secondary font-display">Gestión simplificada</h3>
-                            <p className="text-text-secondary leading-relaxed">
-                                Centralizá reservas, pagos y coordinación de agenda en un solo lugar diseñado para tu práctica.
-                            </p>
-                        </div>
-
-                        {/* Benefit 3 */}
-                        <div className="flex flex-col items-start space-y-4 p-8 rounded-2xl border border-neutral-100 shadow-sm hover:shadow-xl transition-all duration-300 group bg-white">
-                            <div className="p-4 bg-secondary/10 text-secondary rounded-xl mb-2 group-hover:scale-110 transition-transform duration-300">
-                                <ShieldCheck className="h-8 w-8" />
-                            </div>
-                            <h3 className="text-xl font-bold text-secondary font-display">Pertenencia a una red validada</h3>
-                            <p className="text-text-secondary leading-relaxed">
-                                No cualquiera entra. Formás parte de un estándar profesional que te posiciona y avala.
-                            </p>
+                        <div className="bg-neutral-50 rounded-2xl p-8 border border-neutral-100 space-y-5">
+                            {[
+                                "Formación acreditada",
+                                "Experiencia comprobable",
+                                "Entrevista de validación",
+                                "Compromiso ético y confidencialidad"
+                            ].map((item) => (
+                                <div key={item} className="flex items-center gap-4">
+                                    <div className="bg-primary rounded-full p-1 shadow-sm shadow-primary/20 shrink-0">
+                                        <CheckCircle className="h-4 w-4 text-white" />
+                                    </div>
+                                    <span className="text-secondary font-medium">{item}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* --- MODELO Y COMISIÓN --- */}
-            <section className="py-24 bg-secondary text-white">
-                <div className="container mx-auto px-4 md:px-6">
-                    <div className="max-w-3xl mx-auto text-center space-y-12">
-                        <div className="space-y-4">
-                            <h2 className="text-3xl md:text-4xl font-bold font-display">Modelo claro y transparente</h2>
-                            <p className="text-lg text-blue-100/80">SmartWell funciona bajo un modelo de intermediación tecnológica simple.</p>
-                        </div>
-
-                        <div className="bg-white/5 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-white/10 shadow-2xl">
-                            <ul className="space-y-6 text-left inline-block mx-auto">
-                                <li className="flex items-start gap-4">
-                                    <div className="mt-1 bg-primary rounded-full p-1 opacity-100 shadow-lg shadow-primary/20"><CheckCircle className="h-4 w-4 text-white" /></div>
-                                    <span className="text-lg md:text-xl font-medium">Comisión del 10% <span className="text-primary font-bold">únicamente sobre clientes derivados</span>.</span>
-                                </li>
-                                <li className="flex items-center gap-4">
-                                    <div className="bg-primary rounded-full p-1 opacity-100 shadow-lg shadow-primary/20"><CheckCircle className="h-4 w-4 text-white" /></div>
-                                    <span className="text-lg md:text-xl">No se aplica sobre tus clientes propios.</span>
-                                </li>
-                                <li className="flex items-center gap-4">
-                                    <div className="bg-primary rounded-full p-1 opacity-100 shadow-lg shadow-primary/20"><CheckCircle className="h-4 w-4 text-white" /></div>
-                                    <span className="text-lg md:text-xl">Sin costos fijos mensuales.</span>
-                                </li>
-                                <li className="flex items-center gap-4">
-                                    <div className="bg-primary rounded-full p-1 opacity-100 shadow-lg shadow-primary/20"><CheckCircle className="h-4 w-4 text-white" /></div>
-                                    <span className="text-lg md:text-xl">Sin suscripciones ocultas.</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div className="pt-4">
-                            <p className="text-xl font-semibold tracking-wide uppercase text-primary">
-                                Creemos en un modelo alineado a resultados.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* --- PROCESO DE VALIDACIÓN --- */}
-            <section id="proceso-seleccion" className="py-24 bg-white relative">
+            {/* --- CÓMO APLICAR --- */}
+            <section id="proceso-seleccion" className="py-24 bg-neutral-50 relative">
                 <div className="container mx-auto px-4 md:px-6">
                     <div className="text-center mb-16">
-                        <span className="text-primary font-semibold tracking-wider text-sm uppercase mb-2 block">CÓMO UNIRSE</span>
-                        <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-4">Nuestro proceso de selección</h2>
-                        <p className="text-text-secondary max-w-2xl mx-auto text-lg">
-                            Buscamos profesionales con formación acreditable, ética sólida y compromiso real con sus consultantes.
+                        <span className="text-primary font-semibold tracking-wider text-sm uppercase mb-2 block">Cómo unirse</span>
+                        <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-4">Cómo aplicar</h2>
+                        <p className="text-text-secondary max-w-xl mx-auto text-lg">
+                            El proceso es selectivo y prioriza calidad sobre volumen.
                         </p>
                     </div>
 
-                    <div className="grid md:grid-cols-4 gap-8 relative">
-                        {/* Connecting Line (Desktop) */}
-                        <div className="hidden md:block absolute top-8 left-[12%] right-[12%] h-0.5 bg-neutral-100 -z-10" />
-
+                    <div className="grid md:grid-cols-3 gap-8 relative max-w-4xl mx-auto">
+                        <div className="hidden md:block absolute top-8 left-[16%] right-[16%] h-0.5 bg-neutral-200 -z-10" />
                         {[
-                            { step: "01", title: "Postulación online", desc: "Completás un formulario simple con tus datos." },
-                            { step: "02", title: "Revisión de perfil", desc: "Evaluamos tu formación y experiencia clínica." },
-                            { step: "03", title: "Breve entrevista", desc: "Validamos identidad y alineación de valores." },
-                            { step: "04", title: "Activación", desc: "Tu perfil profesional queda visible en la red." }
+                            { step: "01", title: "Completá tu aplicación", desc: "Completás un formulario con tus datos, formación y experiencia." },
+                            { step: "02", title: "Proceso de validación", desc: "Revisamos tu perfil y acordamos una breve entrevista de alineación." },
+                            { step: "03", title: "Activación dentro de la red", desc: "Una vez validado, tu perfil queda activo y comenzás a recibir consultas." },
                         ].map((item, idx) => (
-                            <div key={idx} className="flex flex-col items-center text-center space-y-4 bg-white p-4">
+                            <div key={idx} className="flex flex-col items-center text-center space-y-4 bg-white p-6 rounded-2xl border border-neutral-100 shadow-sm">
                                 <div className="h-16 w-16 rounded-full bg-white border-4 border-primary text-primary flex items-center justify-center text-xl font-bold shadow-lg shadow-primary/10 z-10 font-display">
                                     {item.step}
                                 </div>
@@ -203,30 +164,44 @@ export default function ProfessionalLandingPage() {
                 </div>
             </section>
 
+            {/* --- POSICIONAMIENTO EMOCIONAL --- */}
+            <section className="py-24 bg-secondary text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+                    <svg width="200" height="200" viewBox="0 0 100 100" fill="currentColor">
+                        <circle cx="50" cy="50" r="40" />
+                    </svg>
+                </div>
+                <div className="container mx-auto px-4 md:px-6 max-w-3xl text-center space-y-6 relative z-10">
+                    <h2 className="text-3xl md:text-4xl font-bold font-display leading-tight">
+                        No buscamos volumen. Buscamos compromiso.
+                    </h2>
+                    <p className="text-lg text-blue-100/80 leading-relaxed">
+                        Estamos construyendo una red profesional de referencia en Latinoamérica.<br />
+                        Si tu enfoque es serio, humano y basado en evidencia, este espacio es para vos.
+                    </p>
+                </div>
+            </section>
+
             {/* --- ÁREAS --- */}
-            <section className="py-24 bg-background">
+            <section className="py-24 bg-white">
                 <div className="container mx-auto px-4 md:px-6">
                     <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary text-center mb-12">
                         Áreas que estamos incorporando
                     </h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                         {PROFESSIONAL_CATEGORIES.map((area) => {
-                            // Dynamically get the icon component from lucide-react
                             const IconComponent = (LucideIcons as any)[area.icon];
-
-                            // Map category colors to Tailwind classes
                             const colorMap: Record<string, string> = {
                                 'primary': 'text-blue-600 bg-blue-50',
                                 'accent': 'text-red-600 bg-red-50',
                                 'secondary': 'text-green-600 bg-green-50',
                             };
-
                             return (
-                                <div key={area.id} className="flex flex-col items-center justify-center p-8 bg-white rounded-2xl shadow-sm border border-neutral-100 hover:shadow-lg hover:border-primary/20 transition-all group">
+                                <div key={area.id} className="flex flex-col items-center justify-center p-8 bg-neutral-50 rounded-2xl shadow-sm border border-neutral-100 hover:shadow-lg hover:border-primary/20 transition-all group">
                                     <div className={`p-4 rounded-full mb-4 group-hover:scale-110 transition-transform ${colorMap[area.color] || 'text-indigo-600 bg-indigo-50'}`}>
                                         {IconComponent && <IconComponent className="h-8 w-8" />}
                                     </div>
-                                    <span className="font-bold text-secondary font-display">{area.name}</span>
+                                    <span className="font-bold text-secondary font-display text-center">{area.name}</span>
                                 </div>
                             );
                         })}
@@ -235,7 +210,7 @@ export default function ProfessionalLandingPage() {
             </section>
 
             {/* --- FAQ --- */}
-            <section className="py-24 bg-white">
+            <section className="py-24 bg-neutral-50">
                 <div className="container mx-auto px-4 md:px-6 max-w-3xl">
                     <div className="text-center mb-12">
                         <h2 className="text-3xl font-bold font-display text-secondary">Preguntas Frecuentes</h2>
@@ -247,7 +222,7 @@ export default function ProfessionalLandingPage() {
                         />
                         <FAQItem
                             question="¿Puedo elegir mis horarios?"
-                            answer="Absolutamente. Vos gestionás tu disponibilidad al 100%. Podes abrir y cerrar agenda cuando quieras desde tu panel."
+                            answer="Absolutamente. Vos gestionás tu disponibilidad al 100%. Podés abrir y cerrar agenda cuando quieras desde tu panel."
                         />
                         <FAQItem
                             question="¿Debo tener matrícula habilitante?"
@@ -261,30 +236,21 @@ export default function ProfessionalLandingPage() {
                 </div>
             </section>
 
-            {/* --- CTA FINAL --- */}
-            <section className="py-24 bg-secondary text-white text-center relative overflow-hidden">
-                {/* Decorative Elements */}
-                <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
-                    <svg width="200" height="200" viewBox="0 0 100 100" fill="currentColor">
-                        <circle cx="50" cy="50" r="40" />
-                    </svg>
-                </div>
-
-                <div className="container mx-auto px-4 md:px-6 space-y-8 relative z-10">
-                    <h2 className="text-3xl md:text-5xl font-bold font-display leading-tight max-w-4xl mx-auto">
-                        ¿Querés formar parte de una red profesional con estándar real?
+            {/* --- CTA FINAL — FORMULARIO --- */}
+            <section className="py-24 bg-white text-center">
+                <div className="container mx-auto px-4 md:px-6 space-y-6 max-w-xl">
+                    <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary">
+                        Aplicá para formar parte de SmartWell
                     </h2>
-                    <div className="flex flex-col items-center gap-4 pt-4">
-                        <Button
-                            className="bg-primary hover:bg-primary-active text-white h-16 px-12 rounded-xl text-xl font-bold tracking-wide uppercase transition-all shadow-xl shadow-primary/30 hover:shadow-2xl hover:-translate-y-1"
-                            asChild
-                        >
-                            <Link href="/postulacion">
-                                INICIAR POSTULACIÓN
-                            </Link>
-                        </Button>
-                        <p className="text-sm text-white/60">Tiempo estimado: 3 minutos</p>
-                    </div>
+                    <p className="text-text-secondary text-lg">Revisamos cada aplicación de forma individual.</p>
+                    <Button
+                        className="bg-primary hover:bg-primary-active text-white h-14 px-10 rounded-xl text-lg font-semibold transition-all shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5"
+                        asChild
+                    >
+                        <Link href="/postulacion">
+                            Aplicar ahora <ArrowRight className="ml-2 h-5 w-5 inline" />
+                        </Link>
+                    </Button>
                 </div>
             </section>
 
