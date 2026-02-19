@@ -11,8 +11,10 @@ import {
     sendDepositInstructionsToPatient,
     sendPaymentRejectedToPatient,
     sendPaymentApprovedToPatient,
+    sendPaymentUploadedToProfessional,
 } from '@/lib/email-deposit';
 import { verifyAuth, unauthorizedResponse } from '@/lib/auth-middleware';
+import { getAdminDb } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
     try {
@@ -135,6 +137,37 @@ export async function POST(request: NextRequest) {
                     );
                 }
                 await sendPaymentApprovedToPatient(data);
+                break;
+
+            case 'payment_uploaded':
+                // El paciente sube comprobante → avisa al profesional
+                // El paciente (userId) puede enviar esto
+                if (data.patientId && data.patientId !== userId) {
+                    return NextResponse.json(
+                        { error: 'Unauthorized: Cannot send email for another user' },
+                        { status: 403 }
+                    );
+                }
+
+                // If professionalEmail is missing, fetch it from Firestore
+                if (!data.professionalEmail && data.professionalId) {
+                    try {
+                        const db = getAdminDb();
+                        const profDoc = await db.collection('professionals').doc(data.professionalId).get();
+                        if (profDoc.exists) {
+                            data.professionalEmail = profDoc.data()?.email;
+                        }
+                    } catch (e) {
+                        console.error('Error fetching professional email:', e);
+                    }
+                }
+
+                if (!data.professionalEmail) {
+                    console.warn('Skipping notification: Professional email not found');
+                    return NextResponse.json({ skipped: true, reason: 'Professional email not found' });
+                }
+
+                await sendPaymentUploadedToProfessional(data);
                 break;
 
             default:

@@ -10,9 +10,9 @@ const FROM_EMAIL = 'SmartWell <noreply@smartwellapp.com>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://smartwellapp.com';
 
 function formatDateES(dateStr: string): string {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    return date.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 const baseStyles = `
@@ -33,32 +33,32 @@ const baseStyles = `
 
 // ── 1. Instrucciones de seña al paciente ──────────────────────────────────────
 export interface DepositInstructionsData {
-    patientName: string;
-    patientEmail: string;
-    professionalName: string;
-    date: string;
-    time: string;
-    duration: number;
-    sessionPrice: number;
-    depositPercent: number;
-    mpAlias: string;
-    appointmentId: string;
+  patientName: string;
+  patientEmail: string;
+  professionalName: string;
+  date: string;
+  time: string;
+  duration: number;
+  sessionPrice: number;
+  depositPercent: number;
+  mpAlias: string;
+  appointmentId: string;
 }
 
 export async function sendDepositInstructionsToPatient(data: DepositInstructionsData) {
-    const {
-        patientName, patientEmail, professionalName,
-        date, time, duration, sessionPrice, depositPercent, mpAlias, appointmentId,
-    } = data;
+  const {
+    patientName, patientEmail, professionalName,
+    date, time, duration, sessionPrice, depositPercent, mpAlias, appointmentId,
+  } = data;
 
-    const depositAmount = Math.round(sessionPrice * depositPercent / 100);
-    const uploadUrl = `${APP_URL}/reservar/pago/${appointmentId}`;
+  const depositAmount = Math.round(sessionPrice * depositPercent / 100);
+  const uploadUrl = `${APP_URL}/reservar/pago/${appointmentId}`;
 
-    const { error } = await resend.emails.send({
-        from: FROM_EMAIL,
-        to: patientEmail,
-        subject: '💳 Instrucciones de Seña para tu Turno - SmartWell',
-        html: `<!DOCTYPE html>
+  const { error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: patientEmail,
+    subject: '💳 Instrucciones de Seña para tu Turno - SmartWell',
+    html: `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><style>${baseStyles}</style></head>
 <body><div class="wrapper"><div class="container">
@@ -103,46 +103,46 @@ export async function sendDepositInstructionsToPatient(data: DepositInstructions
   </div>
 </div></div></div></body>
 </html>`,
-    });
+  });
 
-    if (error) {
-        console.error('❌ Error sending deposit instructions:', error);
-        throw new Error(error.message);
-    }
-    console.log('✅ Deposit instructions sent to patient:', patientEmail);
+  if (error) {
+    console.error('❌ Error sending deposit instructions:', error);
+    throw new Error(error.message);
+  }
+  console.log('✅ Deposit instructions sent to patient:', patientEmail);
 }
 
 // ── 2. Comprobante rechazado por el profesional → avisa al paciente ────────────
 export interface PaymentRejectedData {
-    patientName: string;
-    patientEmail: string;
-    professionalName: string;
-    date: string;
-    time: string;
-    appointmentId: string;
-    isSecondRejection?: boolean;
-    rejectionReason?: string;
+  patientName: string;
+  patientEmail: string;
+  professionalName: string;
+  date: string;
+  time: string;
+  appointmentId: string;
+  isSecondRejection?: boolean;
+  rejectionReason?: string;
 }
 
 export async function sendPaymentRejectedToPatient(data: PaymentRejectedData) {
-    const {
-        patientName, patientEmail, professionalName,
-        date, time, appointmentId, isSecondRejection, rejectionReason,
-    } = data;
+  const {
+    patientName, patientEmail, professionalName,
+    date, time, appointmentId, isSecondRejection, rejectionReason,
+  } = data;
 
-    const uploadUrl = `${APP_URL}/reservar/pago/${appointmentId}`;
-    const color = isSecondRejection ? '#ef4444' : '#f59e0b';
-    const emoji = isSecondRejection ? '❌' : '⚠️';
-    const title = isSecondRejection ? 'Reserva Cancelada' : 'Comprobante Rechazado';
-    const subject = isSecondRejection
-        ? '❌ Tu reserva fue cancelada - SmartWell'
-        : '⚠️ Comprobante rechazado - Reintentá el pago - SmartWell';
+  const uploadUrl = `${APP_URL}/reservar/pago/${appointmentId}`;
+  const color = isSecondRejection ? '#ef4444' : '#f59e0b';
+  const emoji = isSecondRejection ? '❌' : '⚠️';
+  const title = isSecondRejection ? 'Reserva Cancelada' : 'Comprobante Rechazado';
+  const subject = isSecondRejection
+    ? '❌ Tu reserva fue cancelada - SmartWell'
+    : '⚠️ Comprobante rechazado - Reintentá el pago - SmartWell';
 
-    const { error } = await resend.emails.send({
-        from: FROM_EMAIL,
-        to: patientEmail,
-        subject,
-        html: `<!DOCTYPE html>
+  const { error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: patientEmail,
+    subject,
+    html: `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><style>${baseStyles}</style></head>
 <body><div class="wrapper"><div class="container">
@@ -156,57 +156,57 @@ export async function sendPaymentRejectedToPatient(data: PaymentRejectedData) {
   <div class="content">
     <p>Hola <strong>${patientName}</strong>,</p>
     ${isSecondRejection
-                ? `<p><strong>${professionalName}</strong> no pudo verificar el pago de la seña por segunda vez. Tu reserva fue <strong>cancelada automáticamente</strong>. Si querés intentarlo de nuevo, realizá una nueva reserva.</p>`
-                : `<p><strong>${professionalName}</strong> revisó tu comprobante pero no pudo verificarlo. Tenés <strong>un intento más</strong> para subir el comprobante correcto antes de que el turno se cancele.</p>`
-            }
+        ? `<p><strong>${professionalName}</strong> no pudo verificar el pago de la seña por segunda vez. Tu reserva fue <strong>cancelada automáticamente</strong>. Si querés intentarlo de nuevo, realizá una nueva reserva.</p>`
+        : `<p><strong>${professionalName}</strong> revisó tu comprobante pero no pudo verificarlo. Tenés <strong>un intento más</strong> para subir el comprobante correcto antes de que el turno se cancele.</p>`
+      }
     ${rejectionReason
-                ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;margin:16px 0;">
+        ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;margin:16px 0;">
            <p style="margin:0;font-size:14px;color:#991b1b;">💬 <strong>Motivo:</strong> ${rejectionReason}</p>
          </div>`
-                : ''
-            }
+        : ''
+      }
     <div class="details">
       <div class="row"><span class="label">📅 Fecha</span><span class="value">${formatDateES(date)}</span></div>
       <div class="row"><span class="label">🕐 Hora</span><span class="value">${time} hs</span></div>
       <div class="row"><span class="label">👤 Profesional</span><span class="value">${professionalName}</span></div>
     </div>
     ${!isSecondRejection
-                ? `<center><a href="${uploadUrl}" class="btn" style="background:#f59e0b;color:white;">Reintentar — Subir nuevo comprobante →</a></center>`
-                : ''
-            }
+        ? `<center><a href="${uploadUrl}" class="btn" style="background:#f59e0b;color:white;">Reintentar — Subir nuevo comprobante →</a></center>`
+        : ''
+      }
   </div>
   <div class="footer"><strong>SmartWell</strong> · Bienestar Profesional</div>
 </div></div></div></body>
 </html>`,
-    });
+  });
 
-    if (error) {
-        console.error('❌ Error sending payment rejected email:', error);
-        throw new Error(error.message);
-    }
-    console.log('✅ Payment rejected email sent to patient:', patientEmail);
+  if (error) {
+    console.error('❌ Error sending payment rejected email:', error);
+    throw new Error(error.message);
+  }
+  console.log('✅ Payment rejected email sent to patient:', patientEmail);
 }
 
 // ── 3. Pago aprobado por el profesional → turno confirmado ────────────────────
 export interface PaymentApprovedData {
-    patientName: string;
-    patientEmail: string;
-    professionalName: string;
-    date: string;
-    time: string;
-    duration: number;
-    sessionPrice: number;
-    meetingLink?: string;
+  patientName: string;
+  patientEmail: string;
+  professionalName: string;
+  date: string;
+  time: string;
+  duration: number;
+  sessionPrice: number;
+  meetingLink?: string;
 }
 
 export async function sendPaymentApprovedToPatient(data: PaymentApprovedData) {
-    const { patientName, patientEmail, professionalName, date, time, duration, sessionPrice, meetingLink } = data;
+  const { patientName, patientEmail, professionalName, date, time, duration, sessionPrice, meetingLink } = data;
 
-    const { error } = await resend.emails.send({
-        from: FROM_EMAIL,
-        to: patientEmail,
-        subject: '🎉 ¡Pago verificado! Tu turno está confirmado - SmartWell',
-        html: `<!DOCTYPE html>
+  const { error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: patientEmail,
+    subject: '🎉 ¡Pago verificado! Tu turno está confirmado - SmartWell',
+    html: `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><style>${baseStyles}</style></head>
 <body><div class="wrapper"><div class="container">
@@ -227,23 +227,78 @@ export async function sendPaymentApprovedToPatient(data: PaymentApprovedData) {
       <div class="row"><span class="label">📌 Estado</span><span class="value" style="color:#6366f1;font-weight:700;">✅ Confirmado</span></div>
     </div>
     ${meetingLink
-                ? `<div style="background:#eef2ff;border:2px solid #6366f1;border-radius:12px;padding:20px;margin:24px 0;text-align:center;">
+        ? `<div style="background:#eef2ff;border:2px solid #6366f1;border-radius:12px;padding:20px;margin:24px 0;text-align:center;">
            <p style="margin:0 0 8px 0;font-weight:700;color:#4338ca;">🎥 Videollamada</p>
            <p style="margin:0 0 16px 0;font-size:13px;color:#6b7280;">Disponible 15 minutos antes de tu sesión</p>
            <a href="${meetingLink}" class="btn" style="background:#6366f1;color:white;">Acceder a la Sesión</a>
          </div>`
-                : ''
-            }
+        : ''
+      }
     <center><a href="${APP_URL}/panel-usuario/turnos" class="btn" style="background:#6366f1;color:white;">Ver Mis Turnos</a></center>
   </div>
   <div class="footer"><strong>SmartWell</strong> · Bienestar Profesional</div>
 </div></div></div></body>
 </html>`,
-    });
+  });
 
-    if (error) {
-        console.error('❌ Error sending payment approved email:', error);
-        throw new Error(error.message);
-    }
-    console.log('✅ Payment approved email sent to patient:', patientEmail);
+  if (error) {
+    console.error('❌ Error sending payment approved email:', error);
+    throw new Error(error.message);
+  }
+  console.log('✅ Payment approved email sent to patient:', patientEmail);
+}
+
+// ── 4. Notificación al profesional: Nuevo pago subido ────────────────────────
+export interface PaymentUploadedData {
+  professionalEmail: string;
+  professionalName: string;
+  patientName: string;
+  date: string;
+  time: string;
+  receiptUrl: string;
+}
+
+export async function sendPaymentUploadedToProfessional(data: PaymentUploadedData) {
+  const { professionalEmail, professionalName, patientName, date, time, receiptUrl } = data;
+  const dashboardUrl = `${APP_URL}/panel-profesional`;
+
+  const { error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: professionalEmail,
+    subject: '🔔 Nuevo comprobante de pago recibido - SmartWell',
+    html: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><style>${baseStyles}</style></head>
+<body><div class="wrapper"><div class="container">
+  <div style="background:#f59e0b;padding:36px;text-align:center;">
+    <div style="font-size:52px;margin-bottom:12px;">💳</div>
+    <h1 style="color:white;margin:0 0 8px 0;font-size:24px;">¡Nuevo Comprobante!</h1>
+    <p style="color:rgba(255,255,255,0.9);margin:0;font-size:15px;">Validá el pago para confirmar el turno</p>
+  </div>
+  <div class="content">
+    <p>Hola <strong>${professionalName}</strong>,</p>
+    <p>El paciente <strong>${patientName}</strong> subió el comprobante de pago para su turno.</p>
+    <div class="details">
+      <div class="row"><span class="label">📅 Fecha</span><span class="value">${formatDateES(date)}</span></div>
+      <div class="row"><span class="label">🕐 Hora</span><span class="value">${time} hs</span></div>
+      <div class="row"><span class="label">👤 Paciente</span><span class="value">${patientName}</span></div>
+    </div>
+    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px;margin:20px 0;text-align:center;">
+      <p style="margin:0 0 8px 0;font-size:13px;color:#92400e;">⚠️ Acción requerida</p>
+      <p style="margin:0;font-size:14px;color:#78350f;">Revisá el comprobante y aprobá o rechazá el turno desde tu panel.</p>
+    </div>
+    <center>
+        <a href="${dashboardUrl}" class="btn" style="background:#f59e0b;color:white;">Ir al Panel Profesional →</a>
+    </center>
+  </div>
+  <div class="footer"><strong>SmartWell</strong> · Panel Profesional</div>
+</div></div></div></body>
+</html>`,
+  });
+
+  if (error) {
+    console.error('❌ Error sending payment uploaded email:', error);
+    throw new Error(error.message);
+  }
+  console.log('✅ Payment uploaded email sent to professional:', professionalEmail);
 }

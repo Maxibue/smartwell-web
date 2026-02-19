@@ -162,6 +162,32 @@ export default function SubirComprobantePage() {
                 time: appointment.time,
             }).catch(() => { }); // no bloquear si falla
 
+            // Enviar email al profesional
+            try {
+                const token = await auth.currentUser?.getIdToken();
+                await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        type: 'payment_uploaded',
+                        data: {
+                            patientId: currentUserId,
+                            patientName: auth.currentUser?.displayName || "Paciente",
+                            professionalId: appointment.professionalId,
+                            professionalName: appointment.professionalName,
+                            date: appointment.date,
+                            time: appointment.time,
+                            receiptUrl: downloadURL,
+                        }
+                    })
+                });
+            } catch (emailErr) {
+                console.error('Error sending email notification:', emailErr);
+            }
+
             setUploaded(true);
         } catch (e: any) {
             console.error("Error uploading receipt:", e);
