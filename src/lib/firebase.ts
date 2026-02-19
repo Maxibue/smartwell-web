@@ -35,7 +35,16 @@ if (typeof window !== 'undefined' && !getApps().length) {
 }
 */
 
-const storage = getStorage(app);
+// Initialize Storage only on client-side to avoid SSR issues
+let storage: any = null;
+try {
+    // Check if we are in a browser environment or if getStorage can be mocked
+    if (typeof window !== "undefined") {
+        storage = getStorage(app);
+    }
+} catch (e) {
+    console.warn("Firebase Storage initialization failed (likely SSR):", e);
+}
 
 export { app, auth, db, storage };
 
