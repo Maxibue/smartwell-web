@@ -7,6 +7,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Loader2, User as UserIcon, Phone, Mail, Calendar, Save, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import Image from "next/image";
 
 interface UserProfile {
     firstName: string;
@@ -16,6 +17,7 @@ interface UserProfile {
     gender: string;
     birthDate: string;
     dni: string;
+    photoURL?: string;
 }
 
 const EMPTY_PROFILE: UserProfile = {
@@ -26,7 +28,20 @@ const EMPTY_PROFILE: UserProfile = {
     gender: "",
     birthDate: "",
     dni: "",
+    photoURL: "",
 };
+
+// Curated list of friendly avatars using DiceBear (Notion style 'notionists')
+const AVATAR_OPTIONS = [
+    "https://api.dicebear.com/7.x/notionists/svg?seed=Felix",
+    "https://api.dicebear.com/7.x/notionists/svg?seed=Aneka",
+    "https://api.dicebear.com/7.x/notionists/svg?seed=Milo",
+    "https://api.dicebear.com/7.x/notionists/svg?seed=Sora",
+    "https://api.dicebear.com/7.x/notionists/svg?seed=Lily",
+    "https://api.dicebear.com/7.x/notionists/svg?seed=Leo",
+    "https://api.dicebear.com/7.x/notionists/svg?seed=Zoe",
+    "https://api.dicebear.com/7.x/notionists/svg?seed=Max",
+];
 
 export default function MisDatosPage() {
     const [user, setUser] = useState<User | null>(null);
@@ -51,7 +66,6 @@ export default function MisDatosPage() {
             const snap = await getDoc(doc(db, "users", u.uid));
             if (snap.exists()) {
                 const d = snap.data();
-                // Separar displayName en firstName/lastName si no están guardados por separado
                 const [fn = "", ln = ""] = (u.displayName || "").split(" ");
                 setProfile({
                     firstName: d.firstName || fn,
@@ -61,15 +75,16 @@ export default function MisDatosPage() {
                     gender: d.gender || "",
                     birthDate: d.birthDate || "",
                     dni: d.dni || "",
+                    photoURL: d.photoURL || u.photoURL || AVATAR_OPTIONS[0],
                 });
             } else {
-                // No existe doc en users, usar datos de auth
                 const [fn = "", ln = ""] = (u.displayName || "").split(" ");
                 setProfile({
                     ...EMPTY_PROFILE,
                     firstName: fn,
                     lastName: ln,
                     email: u.email || "",
+                    photoURL: u.photoURL || AVATAR_OPTIONS[0],
                 });
             }
         } catch (e) {
@@ -82,6 +97,8 @@ export default function MisDatosPage() {
         setSaving(true);
         setError(null);
         try {
+            const fullName = `${profile.firstName} ${profile.lastName}`.trim();
+
             // Guardar en Firestore
             await setDoc(doc(db, "users", user.uid), {
                 firstName: profile.firstName,
@@ -91,14 +108,17 @@ export default function MisDatosPage() {
                 gender: profile.gender,
                 birthDate: profile.birthDate,
                 dni: profile.dni,
-                displayName: `${profile.firstName} ${profile.lastName}`.trim(),
+                displayName: fullName,
+                photoURL: profile.photoURL,
                 updatedAt: new Date(),
             }, { merge: true });
 
-            // Actualizar displayName en Firebase Auth
-            const fullName = `${profile.firstName} ${profile.lastName}`.trim();
-            if (fullName && fullName !== user.displayName) {
-                await updateProfile(user, { displayName: fullName });
+            // Actualizar Auth Profile
+            if (fullName !== user.displayName || profile.photoURL !== user.photoURL) {
+                await updateProfile(user, {
+                    displayName: fullName,
+                    photoURL: profile.photoURL
+                });
             }
 
             setSaved(true);
@@ -114,6 +134,10 @@ export default function MisDatosPage() {
     const set = (field: keyof UserProfile) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
         setProfile(prev => ({ ...prev, [field]: e.target.value }));
 
+    const selectAvatar = (url: string) => {
+        setProfile(prev => ({ ...prev, photoURL: url }));
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -123,7 +147,7 @@ export default function MisDatosPage() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-2xl mx-auto space-y-6 pb-12">
             {/* Header */}
             <div>
                 <h2 className="text-2xl font-bold text-secondary">Mis Datos</h2>
@@ -132,20 +156,47 @@ export default function MisDatosPage() {
                 </p>
             </div>
 
-            {/* Avatar + nombre */}
-            <div className="bg-white rounded-xl border border-neutral-100 shadow-sm p-6 flex items-center gap-5">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-2xl font-bold text-primary">
-                        {(profile.firstName?.[0] || profile.email?.[0] || "U").toUpperCase()}
-                    </span>
-                </div>
-                <div>
-                    <p className="text-lg font-bold text-secondary">
-                        {profile.firstName || profile.lastName
-                            ? `${profile.firstName} ${profile.lastName}`.trim()
-                            : "Sin nombre"}
-                    </p>
-                    <p className="text-sm text-text-muted">{profile.email}</p>
+            {/* Avatar Selection */}
+            <div className="bg-white rounded-xl border border-neutral-100 shadow-sm p-6">
+                <h3 className="font-bold text-secondary flex items-center gap-2 text-base mb-4">
+                    <UserIcon className="h-4 w-4 text-primary" />
+                    Elegí tu Avatar
+                </h3>
+
+                <div className="flex flex-col items-center gap-6">
+                    {/* Current Avatar Preview */}
+                    <div className="relative w-24 h-24 rounded-full border-4 border-primary/20 bg-neutral-50 overflow-hidden shadow-sm">
+                        {profile.photoURL ? (
+                            <img
+                                src={profile.photoURL}
+                                alt="Avatar"
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-2xl font-bold">
+                                {profile.firstName?.[0]}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Avatar Grid */}
+                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+                        {AVATAR_OPTIONS.map((url, index) => (
+                            <button
+                                key={index}
+                                type="button"
+                                onClick={() => selectAvatar(url)}
+                                className={`
+                                    relative w-12 h-12 rounded-full overflow-hidden border-2 transition-all hover:scale-110
+                                    ${profile.photoURL === url
+                                        ? "border-primary ring-2 ring-primary/20 ring-offset-2"
+                                        : "border-transparent hover:border-neutral-200"}
+                                `}
+                            >
+                                <img src={url} alt={`Avatar ${index + 1}`} className="w-full h-full object-cover" />
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -273,19 +324,19 @@ export default function MisDatosPage() {
             )}
 
             {/* Botón guardar */}
-            <div className="flex justify-end">
+            <div className="flex justify-end sticky bottom-4 z-40">
                 <Button
                     onClick={handleSave}
                     disabled={saving}
                     size="lg"
-                    className="min-w-[160px]"
+                    className="w-full sm:w-auto min-w-[160px] shadow-lg"
                 >
                     {saving ? (
                         <><Loader2 className="h-4 w-4 animate-spin mr-2" />Guardando...</>
                     ) : saved ? (
                         <><CheckCircle className="h-4 w-4 mr-2" />¡Guardado!</>
                     ) : (
-                        <><Save className="h-4 w-4 mr-2" />Guardar Datos</>
+                        <><Save className="h-4 w-4 mr-2" />Guardar Cambios</>
                     )}
                 </Button>
             </div>
