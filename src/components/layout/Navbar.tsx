@@ -95,7 +95,7 @@ export function Navbar() {
 
                 {/* Desktop Navigation */}
                 <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-text-secondary">
-                    <Link href="/profesionales" className="hover:text-primary transition-colors">Profesionales</Link>
+                    <Link href="/profesionales" className="hover:text-primary transition-colors">Red de Profesionales</Link>
                     {!user && (
                         <Link href="/para-profesionales" className="hover:text-primary transition-colors">Soy Profesional</Link>
                     )}
@@ -149,7 +149,7 @@ export function Navbar() {
                             className="p-3 hover:bg-neutral-50 rounded-lg text-secondary font-medium transition-colors"
                             onClick={() => setIsMobileMenuOpen(false)}
                         >
-                            Profesionales
+                            Red de Profesionales
                         </Link>
                         {!user && (
                             <Link
