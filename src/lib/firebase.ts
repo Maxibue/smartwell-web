@@ -3,6 +3,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 // ✅ SEGURIDAD: Importar App Check para proteger contra uso no autorizado
 // import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
@@ -34,5 +35,7 @@ if (typeof window !== 'undefined' && !getApps().length) {
 }
 */
 
-export { app, auth, db };
+const storage = getStorage(app);
+
+export { app, auth, db, storage };
 
