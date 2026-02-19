@@ -25,8 +25,8 @@ export default function Home() {
                 </div>
 
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold font-display tracking-tight text-secondary leading-[1.15]">
-                  Encontrá el profesional ideal para tu <span className="text-primary relative inline-block">
-                    momento de vida.
+                  La conversación correcta puede <span className="text-primary relative inline-block">
+                    cambiarlo todo.
                     <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary/20" viewBox="0 0 100 10" preserveAspectRatio="none">
                       <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="3" fill="none" />
                     </svg>
@@ -34,7 +34,7 @@ export default function Home() {
                 </h1>
 
                 <p className="text-lg md:text-xl text-text-secondary max-w-[540px] leading-relaxed">
-                  Conectamos personas con profesionales de bienestar validados. <span className="font-medium text-secondary">Matching humano. Acompañamiento real.</span>
+                  Conectamos personas con profesionales de bienestar validados en Latinoamérica.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -54,15 +54,15 @@ export default function Home() {
                 <div className="pt-8 flex flex-wrap gap-y-4 gap-x-8 text-sm font-medium text-text-secondary border-t border-neutral-100 mt-8">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-primary" />
-                    <span>Profesionales validados en Argentina</span>
+                    <span>Red profesional validada en Latinoamérica</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-5 w-5 text-primary" />
-                    <span>Respuesta en menos de 24 horas</span>
+                    <span>Proceso de validación activo y continuo</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Lock className="h-5 w-5 text-primary" />
-                    <span>100% confidencial</span>
+                    <span>100% confidencial y seguro</span>
                   </div>
                 </div>
               </div>
