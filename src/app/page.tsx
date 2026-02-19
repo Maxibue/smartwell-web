@@ -142,44 +142,99 @@ export default function Home() {
         {/* Categories Grid */}
         <section className="py-24 bg-white">
           <div className="container px-4 md:px-6 mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
-              <div className="max-w-2xl">
-                <span className="text-accent font-semibold tracking-wider text-sm uppercase mb-2 block">Especialidades</span>
-                <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-4">Apoyo donde más importa</h2>
-                <p className="text-text-secondary text-lg">No estás solo. Encontrá profesionales expertos en las áreas clave de tu vida.</p>
+
+            {/* Header */}
+            <div className="max-w-2xl mb-12">
+              <span className="text-accent font-semibold tracking-wider text-sm uppercase mb-2 block">Especialidades</span>
+              <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary mb-3">Elegí el área que necesitás hoy.</h2>
+              <p className="text-text-secondary text-lg">Explorá profesionales de bienestar validados en cada especialidad.</p>
+            </div>
+
+            {/* Bloque 1 — Salud Mental */}
+            <div className="mb-10">
+              <p className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">🧠 Salud Mental</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { name: 'Psicología Clínica', color: 'bg-blue-50 text-blue-700 hover:border-blue-200' },
+                  { name: 'Ansiedad y Estrés', color: 'bg-purple-50 text-purple-700 hover:border-purple-200' },
+                  { name: 'Terapia de Pareja', color: 'bg-pink-50 text-pink-700 hover:border-pink-200' },
+                ].map((cat) => (
+                  <Link key={cat.name} href={`/profesionales?cat=${cat.name}`} className={`group relative h-32 flex flex-col justify-end overflow-hidden rounded-2xl p-5 transition-all border border-transparent hover:shadow-lg ${cat.color}`}>
+                    <h3 className="font-bold text-base relative z-10">{cat.name}</h3>
+                    <p className="text-xs opacity-60 mt-0.5 relative z-10">Profesionales validados · Sesiones online</p>
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </Link>
+                ))}
               </div>
-              <Button variant="ghost" className="hidden md:inline-flex text-secondary font-semibold hover:bg-neutral-50 group" asChild>
+            </div>
+
+            {/* Bloque 2 — Nutrición */}
+            <div className="mb-10">
+              <p className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">🥗 Nutrición</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { name: 'Nutrición Deportiva', color: 'bg-green-50 text-green-700 hover:border-green-200' },
+                  { name: 'Alimentación Consciente', color: 'bg-yellow-50 text-yellow-700 hover:border-yellow-200' },
+                ].map((cat) => (
+                  <Link key={cat.name} href={`/profesionales?cat=${cat.name}`} className={`group relative h-32 flex flex-col justify-end overflow-hidden rounded-2xl p-5 transition-all border border-transparent hover:shadow-lg ${cat.color}`}>
+                    <h3 className="font-bold text-base relative z-10">{cat.name}</h3>
+                    <p className="text-xs opacity-60 mt-0.5 relative z-10">Profesionales validados · Sesiones online</p>
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Bloque 3 — Maternidad y Familia */}
+            <div className="mb-10">
+              <p className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">👶 Maternidad y Familia</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { name: 'Lactancia y Sueño', color: 'bg-orange-50 text-orange-700 hover:border-orange-200' },
+                ].map((cat) => (
+                  <Link key={cat.name} href={`/profesionales?cat=${cat.name}`} className={`group relative h-32 flex flex-col justify-end overflow-hidden rounded-2xl p-5 transition-all border border-transparent hover:shadow-lg ${cat.color}`}>
+                    <h3 className="font-bold text-base relative z-10">{cat.name}</h3>
+                    <p className="text-xs opacity-60 mt-0.5 relative z-10">Profesionales validados · Sesiones online</p>
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Bloque 4 — Desarrollo y Carrera */}
+            <div className="mb-10">
+              <p className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">🚀 Desarrollo y Carrera</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { name: 'Coaching y Liderazgo', color: 'bg-indigo-50 text-indigo-700 hover:border-indigo-200' },
+                  { name: 'Desarrollo Profesional', color: 'bg-teal-50 text-teal-700 hover:border-teal-200' },
+                ].map((cat) => (
+                  <Link key={cat.name} href={`/profesionales?cat=${cat.name}`} className={`group relative h-32 flex flex-col justify-end overflow-hidden rounded-2xl p-5 transition-all border border-transparent hover:shadow-lg ${cat.color}`}>
+                    <h3 className="font-bold text-base relative z-10">{cat.name}</h3>
+                    <p className="text-xs opacity-60 mt-0.5 relative z-10">Profesionales validados · Sesiones online</p>
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA centrado */}
+            <div className="mt-10 text-center">
+              <Button size="lg" variant="outline" className="h-12 px-8 rounded-xl border-2 font-semibold group" asChild>
                 <Link href="/profesionales">
-                  Ver todas las áreas <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  Ver todos los profesionales <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { name: 'Psicología Clínica', color: 'bg-blue-50 text-blue-700 hover:border-blue-200' },
-                { name: 'Nutrición Deportiva', color: 'bg-green-50 text-green-700 hover:border-green-200' },
-                { name: 'Lactancia y Sueño', color: 'bg-orange-50 text-orange-700 hover:border-orange-200' },
-                { name: 'Coaching y Liderazgo', color: 'bg-indigo-50 text-indigo-700 hover:border-indigo-200' },
-                { name: 'Terapia de Pareja', color: 'bg-pink-50 text-pink-700 hover:border-pink-200' },
-                { name: 'Desarrollo Profesional', color: 'bg-teal-50 text-teal-700 hover:border-teal-200' },
-                { name: 'Alim. Consciente', color: 'bg-yellow-50 text-yellow-700 hover:border-yellow-200' },
-                { name: 'Ansiedad y Estrés', color: 'bg-purple-50 text-purple-700 hover:border-purple-200' }
-              ].map((cat) => (
-                <Link key={cat.name} href={`/profesionales?cat=${cat.name}`} className={`group relative h-32 flex flex-col justify-end overflow-hidden rounded-2xl p-6 transition-all border border-transparent hover:shadow-lg ${cat.color}`}>
-                  <h3 className="font-bold text-lg relative z-10">{cat.name}</h3>
-                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                    <ArrowRight className="h-5 w-5" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-
-            <div className="mt-8 text-center md:hidden">
-              <Button variant="outline" className="w-full h-12 rounded-xl" asChild>
-                <Link href="/profesionales">Explorar todas</Link>
-              </Button>
-            </div>
           </div>
         </section>
 
