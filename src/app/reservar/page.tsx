@@ -15,6 +15,14 @@ import {
     notifyPatientAppointmentConfirmed
 } from "@/lib/notifications";
 
+interface Service {
+    id: string;
+    name: string;
+    price: number;
+    duration: number;
+    description?: string;
+}
+
 interface Professional {
     id: string;
     firstName: string;
@@ -25,12 +33,14 @@ interface Professional {
     price: number;
     sessionDuration: number;
     profileImage?: string;
+    services?: Service[];
 }
 
 export default function ReservarPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const professionalId = searchParams.get("professional");
+    const serviceId = searchParams.get("service");
 
     const [loading, setLoading] = useState(true);
     const [authChecked, setAuthChecked] = useState(false); // true cuando Firebase resolvió el estado de auth
@@ -136,7 +146,7 @@ export default function ReservarPage() {
 
             // Generate Jitsi meeting room
             const tempAppointmentId = `temp-${Date.now()}`;
-            const meetingRoomName = generateRoomName(tempAppointmentId, professionalId);
+            const meetingRoomName = generateRoomName(tempAppointmentId);
             const meetingUrl = generateJitsiUrl(meetingRoomName);
 
             // Get user data BEFORE creating appointment (needed for patientName/Email in doc)
@@ -157,15 +167,21 @@ export default function ReservarPage() {
             const depositPercent = profData?.depositPercent || 30;
             const hasDeposit = mpAlias.trim() !== '' || paymentCbu.trim() !== '';
 
+            const selectedServiceDetails = professional.services?.find(s => s.id === serviceId);
+            const finalPrice = selectedServiceDetails ? Number(selectedServiceDetails.price) : professional.price;
+            const finalDuration = selectedServiceDetails ? Number(selectedServiceDetails.duration) : professional.sessionDuration;
+            const finalServiceName = selectedServiceDetails ? selectedServiceDetails.name : "Consulta de Bienestar";
+
             // Create appointment — si hay alias/CBU, empieza en pending_payment
             const appointmentRef = await addDoc(collection(db, "appointments"), {
                 userId,
                 professionalId,
                 date: dateStr,
                 time: selectedTime,
-                duration: professional.sessionDuration,
+                duration: finalDuration,
                 status: hasDeposit ? "pending_payment" : "pending",
-                price: professional.price,
+                price: finalPrice,
+                serviceName: finalServiceName,
                 paymentStatus: hasDeposit ? "awaiting_deposit" : "not_required",
                 depositPercent: hasDeposit ? depositPercent : 0,
                 paymentRejections: 0,
@@ -209,8 +225,8 @@ export default function ReservarPage() {
                                 professionalName: `${professional.title} ${professional.firstName} ${professional.lastName}`,
                                 date: dateStr,
                                 time: selectedTime,
-                                duration: professional.sessionDuration,
-                                sessionPrice: professional.price,
+                                duration: selectedServiceDetails ? selectedServiceDetails.duration : professional.sessionDuration,
+                                sessionPrice: selectedServiceDetails ? Number(selectedServiceDetails.price) : professional.price,
                                 depositPercent,
                                 mpAlias,
                                 paymentBank,
@@ -235,8 +251,8 @@ export default function ReservarPage() {
                                 professionalEmail: profData?.email || '',
                                 date: dateStr,
                                 time: selectedTime,
-                                duration: professional.sessionDuration,
-                                price: professional.price,
+                                duration: selectedServiceDetails ? selectedServiceDetails.duration : professional.sessionDuration,
+                                price: selectedServiceDetails ? Number(selectedServiceDetails.price) : professional.price,
                                 meetingLink: `${process.env.NEXT_PUBLIC_APP_URL}/videollamada?appointment=${appointmentRef.id}`,
                             }
                         })
@@ -260,8 +276,8 @@ export default function ReservarPage() {
                             professionalEmail: profData?.email || '',
                             date: dateStr,
                             time: selectedTime,
-                            duration: professional.sessionDuration,
-                            price: professional.price,
+                            duration: selectedServiceDetails ? selectedServiceDetails.duration : professional.sessionDuration,
+                            price: selectedServiceDetails ? Number(selectedServiceDetails.price) : professional.price,
                         }
                     })
                 });
@@ -423,16 +439,26 @@ export default function ReservarPage() {
                             </div>
 
                             <div className="space-y-3 pt-4 border-t border-neutral-200">
+                                {serviceId && professional.services?.find(s => s.id === serviceId) && (
+                                    <div className="mb-3 px-3 py-2 bg-primary/5 rounded-lg border border-primary/20">
+                                        <p className="text-xs font-semibold text-primary uppercase tracking-wide">Servicio Elegido</p>
+                                        <p className="text-sm text-secondary font-medium">{professional.services.find(s => s.id === serviceId)?.name}</p>
+                                    </div>
+                                )}
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm text-text-secondary">Duración</span>
                                     <span className="font-semibold text-secondary">
-                                        {professional.sessionDuration} min
+                                        {serviceId && professional.services?.find(s => s.id === serviceId)
+                                            ? professional.services.find(s => s.id === serviceId)?.duration
+                                            : professional.sessionDuration} min
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm text-text-secondary">Precio</span>
                                     <span className="font-semibold text-primary text-lg">
-                                        ${professional.price}
+                                        ${serviceId && professional.services?.find(s => s.id === serviceId)
+                                            ? Number(professional.services.find(s => s.id === serviceId)?.price).toLocaleString('es-AR')
+                                            : Number(professional.price).toLocaleString('es-AR')}
                                     </span>
                                 </div>
                             </div>
@@ -457,7 +483,9 @@ export default function ReservarPage() {
                                         <div className="flex items-center gap-2 text-sm">
                                             <DollarSign className="h-4 w-4 text-primary" />
                                             <span className="text-secondary font-semibold">
-                                                ${professional.price}
+                                                ${serviceId && professional.services?.find(s => s.id === serviceId)
+                                                    ? Number(professional.services.find(s => s.id === serviceId)?.price).toLocaleString('es-AR')
+                                                    : Number(professional.price).toLocaleString('es-AR')}
                                             </span>
                                         </div>
                                     </div>
