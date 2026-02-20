@@ -3,7 +3,7 @@
  * Single source of truth for all professional specialties/areas
  */
 
-import { Brain, Heart, Users, Zap } from 'lucide-react';
+import { Brain, Apple, Activity, Users, Target, Sparkles, Heart, Zap } from 'lucide-react';
 
 export interface ProfessionalCategory {
     id: string;
@@ -26,69 +26,82 @@ export const PROFESSIONAL_CATEGORIES: ProfessionalCategory[] = [
         icon: 'Brain',
         color: 'primary',
         subcategories: [
-            'Psicología Clínica',
-            'Psicoterapia',
-            'Terapia Cognitivo-Conductual',
-            'Psicoanálisis',
-            'Terapia de Pareja',
-            'Terapia Familiar',
-            'Psicología Infantil',
-            'Psiquiatría',
-            'Counseling',
-            'Mindfulness',
-        ],
+            "Ansiedad y estrés",
+            "Depresión y estado de ánimo",
+            "Terapia individual",
+            "Terapia de pareja",
+            "Duelo y crisis personales",
+            "Adolescencia e infancia"
+        ]
     },
     {
-        id: 'nutricion-integral',
-        name: 'Nutrición Integral',
-        description: 'Clínica, deportiva, embarazo',
-        icon: 'Heart',
+        id: 'nutricion',
+        name: 'Nutrición',
+        description: 'Clínica, deportiva, alimentación',
+        icon: 'Apple',
         color: 'secondary',
         subcategories: [
-            'Nutrición Clínica',
-            'Nutrición Deportiva',
-            'Nutrición en el Embarazo',
-            'Nutrición Pediátrica',
-            'Nutrición Vegetariana/Vegana',
-            'Nutrición Oncológica',
-            'Educación Alimentaria',
-            'Trastornos de la Conducta Alimentaria',
-        ],
+            "Alimentación saludable",
+            "Nutrición deportiva",
+            "Reeducación alimentaria",
+            "Relación con la comida",
+            "Plan nutricional personalizado"
+        ]
     },
     {
-        id: 'maternidad-crianza',
-        name: 'Maternidad y Crianza',
-        description: 'Lactancia, sueño, puericultura',
+        id: 'movimiento',
+        name: 'Movimiento y Salud Física',
+        description: 'Entrenamiento, yoga, rehabilitación',
+        icon: 'Activity',
+        color: 'primary',
+        subcategories: [
+            "Entrenamiento personalizado",
+            "Movilidad y postura",
+            "Rehabilitación funcional",
+            "Yoga terapéutico",
+            "Bienestar corporal integral"
+        ]
+    },
+    {
+        id: 'maternidad',
+        name: 'Maternidad y Familia',
+        description: 'Lactancia, sueño, crianza',
         icon: 'Users',
         color: 'accent',
         subcategories: [
-            'Asesoría de Lactancia',
-            'Doula',
-            'Puericultura',
-            'Crianza Respetuosa',
-            'Sueño Infantil',
-            'Preparación para el Parto',
-            'Postparto',
-            'Estimulación Temprana',
-        ],
+            "Lactancia",
+            "Sueño infantil",
+            "Orientación para padres",
+            "Crianza y vínculos familiares"
+        ]
     },
     {
-        id: 'desarrollo-personal-profesional',
-        name: 'Desarrollo Personal y Profesional',
-        description: 'Coaching, carrera, liderazgo',
-        icon: 'Zap',
+        id: 'coaching',
+        name: 'Coaching',
+        description: 'Carrera, liderazgo, desarrollo',
+        icon: 'Target',
         color: 'tertiary',
         subcategories: [
-            'Coaching Personal',
-            'Coaching Profesional',
-            'Coaching de Carrera',
-            'Liderazgo',
-            'Desarrollo de Habilidades',
-            'Orientación Vocacional',
-            'Mentoring',
-            'Inteligencia Emocional',
-        ],
+            "Desarrollo de carrera",
+            "Transición laboral",
+            "Liderazgo",
+            "Coaching ejecutivo",
+            "Orientación vocacional"
+        ]
     },
+    {
+        id: 'espiritualidad',
+        name: 'Espiritualidad y Propósito',
+        description: 'Mindfulness, meditación, propósito',
+        icon: 'Sparkles',
+        color: 'primary',
+        subcategories: [
+            "Búsqueda de propósito",
+            "Acompañamiento espiritual",
+            "Meditación y mindfulness",
+            "Desarrollo personal profundo"
+        ]
+    }
 ];
 
 /**

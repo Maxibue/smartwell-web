@@ -4,73 +4,7 @@ import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 
-const AREAS = [
-    {
-        title: "Salud Mental",
-        slug: "salud-mental",
-        subcategories: [
-            "Ansiedad y estrés",
-            "Depresión y estado de ánimo",
-            "Terapia individual",
-            "Terapia de pareja",
-            "Duelo y crisis personales",
-            "Adolescencia e infancia"
-        ]
-    },
-    {
-        title: "Nutrición",
-        slug: "nutricion",
-        subcategories: [
-            "Alimentación saludable",
-            "Nutrición deportiva",
-            "Reeducación alimentaria",
-            "Relación con la comida",
-            "Plan nutricional personalizado"
-        ]
-    },
-    {
-        title: "Movimiento y Salud Física",
-        slug: "movimiento",
-        subcategories: [
-            "Entrenamiento personalizado",
-            "Movilidad y postura",
-            "Rehabilitación funcional",
-            "Yoga terapéutico",
-            "Bienestar corporal integral"
-        ]
-    },
-    {
-        title: "Maternidad y Familia",
-        slug: "maternidad",
-        subcategories: [
-            "Lactancia",
-            "Sueño infantil",
-            "Orientación para padres",
-            "Crianza y vínculos familiares"
-        ]
-    },
-    {
-        title: "Coaching",
-        slug: "coaching",
-        subcategories: [
-            "Desarrollo de carrera",
-            "Transición laboral",
-            "Liderazgo",
-            "Coaching ejecutivo",
-            "Orientación vocacional"
-        ]
-    },
-    {
-        title: "Espiritualidad y Propósito",
-        slug: "espiritualidad",
-        subcategories: [
-            "Búsqueda de propósito",
-            "Acompañamiento espiritual",
-            "Meditación y mindfulness",
-            "Desarrollo personal profundo"
-        ]
-    }
-];
+import { PROFESSIONAL_CATEGORIES } from "@/lib/categories";
 
 export default function ComenzarPage() {
     return (
@@ -88,16 +22,16 @@ export default function ComenzarPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-16">
-                    {AREAS.map((area) => (
-                        <div key={area.title} className="flex flex-col">
+                    {PROFESSIONAL_CATEGORIES.map((category) => (
+                        <div key={category.id} className="flex flex-col">
                             <h2 className="text-2xl font-bold text-secondary font-display mb-6 pb-3 border-b border-neutral-100">
-                                {area.title}
+                                {category.name}
                             </h2>
                             <ul className="flex flex-col gap-4">
-                                {area.subcategories.map((sub, i) => (
+                                {(category.subcategories || []).map((sub, i) => (
                                     <li key={i}>
                                         <Link
-                                            href={`/profesionales?area=${area.slug}&search=${encodeURIComponent(sub)}`}
+                                            href={`/profesionales?area=${category.id}&search=${encodeURIComponent(sub)}`}
                                             className="text-[17px] text-text-secondary hover:text-secondary font-medium transition-colors duration-200 inline-flex hover:underline underline-offset-[5px] decoration-neutral-300"
                                         >
                                             {sub}
