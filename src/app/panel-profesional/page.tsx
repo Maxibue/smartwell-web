@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
     Calendar, Users, DollarSign, Clock, Loader2, Video,
-    Edit2, Check, X, TrendingUp, CheckCircle, AlertCircle, ChevronDown, XCircle
+    Edit2, Check, X, TrendingUp, CheckCircle, AlertCircle, ChevronDown, XCircle, Copy
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -125,6 +125,16 @@ export default function ProfessionalDashboard() {
     const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
     const [showRejectInput, setShowRejectInput] = useState<string | null>(null);
     const [cancelModal, setCancelModal] = useState<{ show: boolean; session: Session | null }>({ show: false, session: null });
+    const [isLinkCopied, setIsLinkCopied] = useState(false);
+
+    const handleCopyLink = () => {
+        if (!user) return;
+        const url = `${window.location.origin}/profesionales/${user.uid}`;
+        navigator.clipboard.writeText(url).then(() => {
+            setIsLinkCopied(true);
+            setTimeout(() => setIsLinkCopied(false), 2000);
+        });
+    };
 
     // ── Carga de datos ──────────────────────────────────────────────────────
     const fetchData = async (uid: string) => {
@@ -347,11 +357,18 @@ export default function ProfessionalDashboard() {
                         <p className="text-text-secondary">Aquí tenés un resumen de tu actividad.</p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
+                        <Button
+                            className="bg-primary text-white hover:bg-primary/90"
+                            onClick={handleCopyLink}
+                        >
+                            {isLinkCopied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                            {isLinkCopied ? "Enlace copiado" : "Compartir mi calendario"}
+                        </Button>
                         <Link href={`/profesionales/${user?.uid}`} target="_blank">
                             <Button variant="outline">Ver mi perfil público</Button>
                         </Link>
                         <Link href="/panel-profesional/agendar">
-                            <Button>+ Agendar turno manual</Button>
+                            <Button variant="outline">+ Agendar turno manual</Button>
                         </Link>
                     </div>
                 </div>

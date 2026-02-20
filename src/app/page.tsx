@@ -142,18 +142,23 @@ export default function Home() {
               <p className="text-text-secondary text-lg">Explorá profesionales de bienestar validados en cada especialidad.</p>
             </div>
 
-            {/* Grid 2×2 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Grid 3×2 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
                 {
                   area: "Salud Mental",
-                  sub: "Psicología clínica, ansiedad, estrés y terapia de pareja.",
+                  sub: "Psicología clínica, ansiedad, pareja y acompañamiento emocional.",
                   href: "/profesionales?area=salud-mental",
                 },
                 {
                   area: "Nutrición",
-                  sub: "Nutrición deportiva y alimentación consciente.",
+                  sub: "Nutrición clínica, deportiva y alimentación consciente.",
                   href: "/profesionales?area=nutricion",
+                },
+                {
+                  area: "Movimiento y Salud Física",
+                  sub: "Entrenamiento personalizado, movimiento terapéutico y bienestar corporal.",
+                  href: "/profesionales?area=movimiento",
                 },
                 {
                   area: "Maternidad y Familia",
@@ -161,25 +166,30 @@ export default function Home() {
                   href: "/profesionales?area=maternidad",
                 },
                 {
-                  area: "Desarrollo y Carrera",
-                  sub: "Coaching, liderazgo y desarrollo profesional.",
-                  href: "/profesionales?area=desarrollo",
+                  area: "Coaching",
+                  sub: "Desarrollo profesional, liderazgo y transición de carrera.",
+                  href: "/profesionales?area=coaching",
+                },
+                {
+                  area: "Espiritualidad y Propósito",
+                  sub: "Procesos de sentido, crecimiento interior y acompañamiento personal.",
+                  href: "/profesionales?area=espiritualidad",
                 },
               ].map((card) => (
                 <Link
                   key={card.area}
                   href={card.href}
-                  className="group flex flex-col justify-between p-7 bg-white border border-neutral-200 rounded-2xl hover:border-neutral-400 hover:shadow-lg transition-all duration-200"
+                  className="group flex flex-col justify-between p-8 bg-white border border-neutral-200 rounded-2xl hover:border-neutral-400 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-300"
                 >
                   <div>
-                    <h3 className="text-xl font-bold text-secondary font-display mb-2">{card.area}</h3>
+                    <h3 className="text-xl font-bold text-secondary font-display mb-3">{card.area}</h3>
                     <p className="text-sm text-text-secondary leading-relaxed">{card.sub}</p>
                   </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <span className="text-xs text-text-muted">Profesionales validados en LATAM · Online</span>
+                  <div className="mt-8 flex flex-col items-start gap-4">
                     <span className="text-sm font-semibold text-secondary flex items-center gap-1 group-hover:gap-2 transition-all">
                       Explorar <ArrowRight className="h-4 w-4" />
                     </span>
+                    <span className="text-xs text-text-muted">Profesionales validados en LATAM · Online</span>
                   </div>
                 </Link>
               ))}

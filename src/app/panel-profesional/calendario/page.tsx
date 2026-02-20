@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, X, Copy, Check } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, Timestamp, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -57,6 +57,17 @@ export default function CalendarPage() {
     // Modal states
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [selectedSlot, setSelectedSlot] = useState<{ date: string; time: string } | null>(null);
+    const [isLinkCopied, setIsLinkCopied] = useState(false);
+
+    const handleCopyLink = () => {
+        if (!user) return;
+        const url = `${window.location.origin}/profesionales/${user.uid}`;
+        navigator.clipboard.writeText(url).then(() => {
+            setIsLinkCopied(true);
+            setTimeout(() => setIsLinkCopied(false), 2000);
+        });
+    };
+
     const [newAppointment, setNewAppointment] = useState({
         patientName: "",
         patientEmail: "",
@@ -553,7 +564,16 @@ export default function CalendarPage() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-secondary">Calendario de Turnos</h1>
-                    <p className="text-text-secondary">Gestiona tu agenda {view === 'week' ? 'semanal' : view === 'day' ? 'diaria' : 'mensual'}</p>
+                    <p className="text-text-secondary mb-3">Gestiona tu agenda {view === 'week' ? 'semanal' : view === 'day' ? 'diaria' : 'mensual'}</p>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-primary/5 text-primary border-primary/20 hover:bg-primary/10"
+                        onClick={handleCopyLink}
+                    >
+                        {isLinkCopied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                        {isLinkCopied ? "Enlace copiado" : "Compartir enlace de reserva"}
+                    </Button>
                 </div>
 
                 {/* Stats Cards */}
