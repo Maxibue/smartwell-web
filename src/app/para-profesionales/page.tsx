@@ -188,23 +188,22 @@ export default function ProfessionalLandingPage() {
                     <h2 className="text-3xl md:text-4xl font-bold font-display text-secondary text-center mb-12">
                         Áreas que estamos incorporando
                     </h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        {PROFESSIONAL_CATEGORIES.map((area) => {
-                            const IconComponent = (LucideIcons as any)[area.icon];
-                            const colorMap: Record<string, string> = {
-                                'primary': 'text-blue-600 bg-blue-50',
-                                'accent': 'text-red-600 bg-red-50',
-                                'secondary': 'text-green-600 bg-green-50',
-                            };
-                            return (
-                                <div key={area.id} className="flex flex-col items-center justify-center p-8 bg-neutral-50 rounded-2xl shadow-sm border border-neutral-100 hover:shadow-lg hover:border-primary/20 transition-all group">
-                                    <div className={`p-4 rounded-full mb-4 group-hover:scale-110 transition-transform ${colorMap[area.color] || 'text-indigo-600 bg-indigo-50'}`}>
-                                        {IconComponent && <IconComponent className="h-8 w-8" />}
-                                    </div>
-                                    <span className="font-bold text-secondary font-display text-center">{area.name}</span>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[
+                            { name: "Salud Mental", icon: <LucideIcons.Brain className="h-8 w-8 text-neutral-600" /> },
+                            { name: "Nutrición", icon: <LucideIcons.Apple className="h-8 w-8 text-neutral-600" /> },
+                            { name: "Movimiento y Salud Física", icon: <LucideIcons.Activity className="h-8 w-8 text-neutral-600" /> },
+                            { name: "Maternidad y Familia", icon: <LucideIcons.Users className="h-8 w-8 text-neutral-600" /> },
+                            { name: "Coaching", icon: <LucideIcons.Target className="h-8 w-8 text-neutral-600" /> },
+                            { name: "Espiritualidad y Propósito", icon: <LucideIcons.Sparkles className="h-8 w-8 text-neutral-600" /> },
+                        ].map((area, idx) => (
+                            <div key={idx} className="flex flex-col items-center justify-center p-8 bg-white rounded-2xl shadow-sm border border-neutral-100 hover:shadow-lg hover:border-neutral-300 transition-all group">
+                                <div className="p-4 rounded-full mb-4 bg-neutral-100 group-hover:scale-110 transition-transform">
+                                    {area.icon}
                                 </div>
-                            );
-                        })}
+                                <span className="font-bold text-secondary font-display text-center">{area.name}</span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </section>
