@@ -33,7 +33,7 @@ export function Footer() {
                         <ul className="space-y-2 text-sm text-text-secondary">
                             <li><Link href="/comenzar" className="hover:text-primary">Buscar Profesional</Link></li>
                             <li><Link href="/profesionales" className="hover:text-primary">Profesionales</Link></li>
-                            <li><Link href="/blog" className="hover:text-primary">Blog</Link></li>
+                            <li><span className="text-neutral-400 cursor-not-allowed" title="Próximamente">Blog</span></li>
                         </ul>
                     </div>
 
@@ -42,7 +42,7 @@ export function Footer() {
                         <ul className="space-y-2 text-sm text-text-secondary">
                             <li><Link href="/sobre-nosotros" className="hover:text-primary">Sobre Nosotros</Link></li>
                             <li><Link href="/para-profesionales" className="hover:text-primary">Sumate como profesional</Link></li>
-                            <li><Link href="/contacto" className="hover:text-primary">Contacto</Link></li>
+                            <li><a href="mailto:hola@smartwellapp.com" className="hover:text-primary">Contacto</a></li>
                         </ul>
                     </div>
 
